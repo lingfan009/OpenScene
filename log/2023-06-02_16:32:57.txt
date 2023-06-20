@@ -1,0 +1,5 @@
+time:2023-06-02 16:32:57, log_content:generating version:autra_train_v2.13/, !
+time:2023-06-02 16:53:45, log_content:finish-done-tos:perception-dataset-v2/autra_train_v2.13/, version:tos:perception-dataset-v2/autra_train_v2.13/, total_cnt:917, mis_cnt:0!
+time:2023-06-02 16:53:45, log_content:generating version:autra_train_v2.18/, !
+time:2023-06-02 17:44:53, log_content:finish-done-tos:perception-dataset-v2/autra_train_v2.18/, version:tos:perception-dataset-v2/autra_train_v2.18/, total_cnt:3049, mis_cnt:0!
+time:2023-06-02 17:44:54, log_content:generating version:autra_eval_v2.05/ACRUSH/, !

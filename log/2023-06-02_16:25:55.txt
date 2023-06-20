@@ -1,0 +1,5 @@
+time:2023-06-02 16:25:55, log_content:generating version:autra_train_v2.13/, !
+time:2023-06-02 16:25:55, log_content:generating version:autra_train_v2.18/, !
+time:2023-06-02 16:25:55, log_content:generating version:autra_eval_v2.05/ACRUSH/, !
+time:2023-06-02 16:25:55, log_content:generating version:autra_eval_v2.05/JAMES/, !
+time:2023-06-02 16:25:55, log_content:generating version:autra_eval_v2.05/ROBIN/, !
