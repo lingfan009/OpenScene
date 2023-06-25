@@ -122,7 +122,7 @@ def main_worker(gpu, ngpus_per_node, argss):
     global args
     global best_iou
     args = argss
-
+    
     if args.distributed:
         if args.multiprocessing_distributed:
             args.rank = args.rank * ngpus_per_node + gpu
@@ -158,6 +158,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             checkpoint = torch.load(
                 args.resume, map_location=lambda storage, loc: storage.cuda())
             args.start_epoch = checkpoint['epoch']
+            args.epochs = args.start_epoch + args.epochs
             model.load_state_dict(checkpoint['state_dict'], strict=True)
             optimizer.load_state_dict(checkpoint['optimizer'])
             best_iou = checkpoint['best_iou']
@@ -268,8 +269,8 @@ def obtain_text_features_and_palette():
         palette = get_palette(colormap='nuscenes16')
         dataset_name = 'nuscenes'
 
-    #if not os.path.exists('saved_text_embeddings'):
-    #    os.makedirs('saved_text_embeddings')
+    if not os.path.exists('saved_text_embeddings'):
+        os.makedirs('saved_text_embeddings')
 
     if 'openseg' in args.feature_2d_extractor:
         model_name="ViT-L/14@336px"

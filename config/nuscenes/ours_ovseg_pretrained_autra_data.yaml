@@ -1,6 +1,6 @@
 DATA:
   data_root: data/nuscenes_autra_3d_test
-  data_root_2d_fused_feature: fuse_feature_data/nuscenes_autra_2d_test
+  data_root_2d_fused_feature: fuse_2d_features/nuscenes_autra_2d_test
   feature_2d_extractor: openseg
   classes: 16
   aug: False
@@ -19,7 +19,7 @@ DISTILL:
   base_lr: 0.0001
   loss_type: cosine # l1 | cosine
   loop: 1
-  epochs: 20
+  epochs: 50
   start_epoch: 0
   power: 0.9
   momentum: 0.9
@@ -29,7 +29,7 @@ DISTILL:
   save_path:
   resume:
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
-  eval_freq: 10
+  eval_freq: 5
 
 TEST:
   split: val  # split in [train, val]

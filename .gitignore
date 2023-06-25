@@ -8,6 +8,10 @@ original_dataset/
 perception_train_data/
 autra_data/
 model_checkpoint/
+fuse_2d_features/
+exp_dir/
+ori_sample_data/
+pre_train_model_checkpoint/
 
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template

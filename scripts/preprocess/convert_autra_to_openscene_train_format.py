@@ -1,4 +1,3 @@
-from nuscenes.nuscenes import NuScenes
 import torch
 import os
 import os.path as osp
@@ -34,6 +33,7 @@ NUSCENES_CLASS_REMAP[27] = 14 # terrain
 NUSCENES_CLASS_REMAP[28] = 15 # manmade
 NUSCENES_CLASS_REMAP[30] = 16 # vegetation
 
+# 将autra抽帧打包对齐的数据，转化成openscene支持的nuscene格式的训练数据集
 
 cam_types = ['camera_upmiddle_right', 'camera_upmiddle_middle', 'camera_upmiddle_left', 'camera_left_front', 'camera_left_backward', 'camera_right_front', 'camera_right_backward']
 cam_type_dict = {
@@ -89,16 +89,16 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
 
         labels = np.ones((coors.shape[0], 1))*17
         save_data = np.concatenate([coors, labels], axis=1)
-        save_dir = osp.join(openscene_train_data, 'autra_3d_test', 'train')
+        save_dir = osp.join(openscene_train_data, 'nuscenes_autra_3d_test', 'train')
         if not osp.exists(save_dir):
             os.makedirs(save_dir)
-        save_file = osp.join(openscene_train_data, 'autra_3d_test', 'train', scene_name + ".pth")
+        save_file = osp.join(openscene_train_data, 'nuscenes_autra_3d_test', 'train', scene_name + ".pth")
         save_lidar_data(save_data, True, save_file)
 
         # create folder
-        out_dir_color = os.path.join(openscene_train_data, 'autra_2d_test', 'train', scene_name, 'color')
-        out_dir_pose = os.path.join(openscene_train_data, 'autra_2d_test', 'train', scene_name, 'pose')
-        out_dir_K = os.path.join(openscene_train_data, 'autra_2d_test', 'train', scene_name, 'K')
+        out_dir_color = os.path.join(openscene_train_data, 'nuscenes_autra_2d_test', 'train', scene_name, 'color')
+        out_dir_pose = os.path.join(openscene_train_data, 'nuscenes_autra_2d_test', 'train', scene_name, 'pose')
+        out_dir_K = os.path.join(openscene_train_data, 'nuscenes_autra_2d_test', 'train', scene_name, 'K')
         os.makedirs(out_dir_color, exist_ok=True)
         os.makedirs(out_dir_pose, exist_ok=True)
         os.makedirs(out_dir_K, exist_ok=True)
@@ -142,8 +142,8 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
 
 
 def main():
-    autra_train_data = "/home/fan.ling/Code/infra/autra_perception_infra/data_labeling/dataset/baidu_labeling/2023051902/package_data/2023051902_180000-baidu-case_mining-discrete-lidar_only/Robin-20230511_131509_1683784739_1683784769"
-    openscene_train_data = "/home/fan.ling/Work/big_model/openScene/openscene/data/"
+    autra_train_data = "ori_sample_data/Robin-20230511_131509_1683784739_1683784769"
+    openscene_train_data = "data/"
     convert_autra_to_openscene_train_format(autra_train_data, openscene_train_data)
 
 if __name__ == '__main__':

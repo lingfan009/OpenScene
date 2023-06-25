@@ -29,6 +29,83 @@ def get_args():
     return args
 
 
+def process_one_scene_online(data_path, param_dict):
+    '''Process one scene.'''
+
+    # short hand
+    split = param_dict['split']
+    img_size = param_dict['img_dim']
+    data_root_2d = param_dict['data_root_2d']
+    point2img_mapper = param_dict['point2img_mapper']
+    openseg_model = param_dict['openseg_model']
+    text_emb = param_dict['text_emb']
+    feat_dim = param_dict['feat_dim']
+    cam_locs = ['back', 'back_left', 'back_right', 'front', 'front_left', 'front_right']
+    cam_locs = ['camera_upmiddle_right', 'camera_upmiddle_middle', 'camera_upmiddle_left', 'camera_left_front', 'camera_left_backward', 'camera_right_front', 'camera_right_backward']
+
+    # load 3D data (point cloud, color and the corresponding labels)
+    # Only process points with GT label annotation
+    locs_in = torch.load(data_path)[0]
+    labels_in = torch.load(data_path)[2]
+    mask_entire = labels_in!=255
+
+    locs_in = locs_in[mask_entire]
+    n_points = locs_in.shape[0]
+
+    scene_id = data_path.split('/')[-1].split('.')[0]
+
+    # process 2D features
+    scene = join(data_root_2d, split, scene_id)
+    img_dir_base = join(scene, 'color')
+    pose_dir_base = join(scene, 'pose')
+    K_dir_base = join(scene, 'K')
+    num_img = len(cam_locs)
+
+    device = torch.device('cpu')
+    #device = torch.device('gpu:0')
+
+    n_points_cur = n_points
+    counter = torch.zeros((n_points_cur, 1), device=device)
+    sum_features = torch.zeros((n_points_cur, feat_dim), device=device)
+
+    vis_id = torch.zeros((n_points_cur, num_img), dtype=int, device=device)
+    
+    for img_id, cam in enumerate(tqdm(cam_locs)):
+        intr = np.load(join(K_dir_base, cam+'.npy'))
+        pose = np.load(join(pose_dir_base, cam+'.npy'))
+        img_dir = join(img_dir_base, cam+'.jpg')
+        # calculate the 3d-2d mapping
+        mapping = np.ones([n_points_cur, 4], dtype=int)
+        print(f'cam:{cam}')
+        mapping[:, 1:4] = point2img_mapper.compute_mapping(pose, locs_in, depth=None, intrinsic=intr)
+        if mapping[:, 3].sum() == 0: # no points corresponds to this image, skip
+            continue
+        print(1)
+        mapping = torch.from_numpy(mapping).to(device)
+        mask = mapping[:, 3]
+        vis_id[:, img_id] = mask
+        print(2)
+        feat_2d = extract_openseg_img_feature(
+            img_dir, openseg_model, text_emb, img_size=[img_size[1], img_size[0]]).to(device)
+        print(f"feat_2d:{feat_2d.shape}")
+        feat_2d_3d = feat_2d[:, mapping[:, 1], mapping[:, 2]].permute(1, 0)
+
+        counter[mask!=0]+= 1
+        sum_features[mask!=0] += feat_2d_3d[mask!=0]
+
+    
+    counter[counter==0] = 1e-5
+    feat_bank = sum_features/counter
+    print(feat_bank.shape)
+    point_ids = torch.unique(vis_id.nonzero(as_tuple=False)[:, 0])
+
+    mask = torch.zeros(n_points, dtype=torch.bool)
+    mask[point_ids] = True
+    mask_entire[mask_entire==True] = mask
+    print(f"scene_id:{scene_id}, n_points_cur:{n_points_cur}, feat_bank[mask]:{feat_bank[mask].shape}")
+    return {"feat": feat_bank[mask].half().cpu(), "mask_full": mask_entire}
+
+
 def process_one_scene(data_path, out_dir, args):
     '''Process one scene.'''
 
@@ -72,12 +149,14 @@ def process_one_scene(data_path, out_dir, args):
 
 
     vis_id = torch.zeros((n_points_cur, num_img), dtype=int, device=device)
+    
     for img_id, cam in enumerate(tqdm(cam_locs)):
         intr = np.load(join(K_dir_base, cam+'.npy'))
         pose = np.load(join(pose_dir_base, cam+'.npy'))
         img_dir = join(img_dir_base, cam+'.jpg')
         # calculate the 3d-2d mapping
         mapping = np.ones([n_points_cur, 4], dtype=int)
+        
         mapping[:, 1:4] = point2img_mapper.compute_mapping(pose, locs_in, depth=None, intrinsic=intr)
         if mapping[:, 3].sum() == 0: # no points corresponds to this image, skip
             continue
@@ -93,7 +172,7 @@ def process_one_scene(data_path, out_dir, args):
         counter[mask!=0]+= 1
         sum_features[mask!=0] += feat_2d_3d[mask!=0]
 
-
+    
     counter[counter==0] = 1e-5
     feat_bank = sum_features/counter
     print(feat_bank.shape)
@@ -102,6 +181,7 @@ def process_one_scene(data_path, out_dir, args):
     mask = torch.zeros(n_points, dtype=torch.bool)
     mask[point_ids] = True
     mask_entire[mask_entire==True] = mask
+    print(f"scene_id:{scene_id}, n_points_cur:{n_points_cur}, feat_bank[mask]:{feat_bank[mask].shape}")
     torch.save({"feat": feat_bank[mask].half().cpu(),
                 "mask_full": mask_entire},
             join(out_dir, scene_id +'.pt'))
@@ -125,8 +205,8 @@ def main(args):
     data_dir = args.data_dir
     args.img_dim = img_dim
 
-    data_root = join(data_dir, 'autra_3d_test')
-    data_root_2d = join(data_dir,'autra_2d_test')
+    data_root = join(data_dir, 'nuscenes_autra_3d_test')
+    data_root_2d = join(data_dir,'nuscenes_autra_2d_test')
 
     args.data_root_2d = data_root_2d
     out_dir = args.output_dir
