@@ -1,5 +1,6 @@
 import os
 import argparse
+import torch
 
 from plyfile import PlyData, PlyElement
 import numpy as np
@@ -79,6 +80,42 @@ def draw_point(feature_type, pcd_index):
         visualize_segment_pcd_file(distill_pcd_file)
 
 
+def visual_point_cloud_with_label():
+    data_path = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/point_with_label/1687768892023-Robin_with_label.pt"
+    data_np = torch.load(data_path)['point_with_label']
+
+    class_names = 'car,tree,grass,pole,road,cyclist,vehicle,truck,bicycle,other flat,buildings,safety barriers,sidewalk,manmade,sky,bus,suv,person,rider'
+    class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 
+               'fire hydrant', 'stop sign', 'parking meter', 'bench', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 
+               'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 
+               'tennis racket' 'couch', 'potted plant', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'banner', 'blanket', 'bridge', 
+               'net', 'pillow', 'platform', 'playingfield', 'railroad', 'road',  'stairs', 'tent', 'towel', 'water', 
+               'tree', 'fence', 'ceiling', 'sky', 'cabinet', 'mountain', 'grass', 'dirt',  'building', 'rock', 'wall', 'rug']
+    
+    show_class_list = ['car', 'truck', 'bus']
+    data_np_list = []
+    for class_name in show_class_list:
+        class_index = class_names.index(class_name)
+        data_np_list.append(data_np[data_np[:,3].int() == class_index])
+    data_np = torch.concat(data_np_list, dim=0)
+
+    # visualization
+    app = gui.Application.instance
+    app.initialize()
+
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(data_np[:, :3])
+    #cloud.colors = o3d.utility.Vector3dVector(np.ones((data_np.shape[0], 3))*data_np[:, 3:4]*12 / 255)
+    cloud.colors = o3d.utility.Vector3dVector(np.ones((data_np.shape[0], 3)) * 5 * 12 / 255)
+    # vis = o3d.visualization.O3DVisualizer("Open3D - 3D Text", 1024, 768)
+    vis = o3d.visualization.O3DVisualizer("Open3D - 3D Text", 2048, 1536)
+
+    vis.show_settings = True
+    vis.add_geometry("Points", cloud)
+    app.add_window(vis)
+    app.run()
+
 if __name__ == "__main__":
     args = parse_args()
-    draw_point(args.feature_type, args.pcd_index)
+    #draw_point(args.feature_type, args.pcd_index)
+    visual_point_cloud_with_label()

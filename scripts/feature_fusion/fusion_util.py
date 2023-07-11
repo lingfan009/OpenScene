@@ -2,9 +2,14 @@ import os
 import torch
 import glob
 import math
+import sys
 import numpy as np
+import pdb
+import cv2
 from tensorflow import io
 import tensorflow.compat.v1 as tf
+sys.path.append("/home/fan.ling/big_model/OvSeg/OvSeg/")
+from demo import get_image_embedding
 
 def read_bytes(path):
     '''Read bytes for OpenSeg model running.'''
@@ -67,33 +72,14 @@ def extract_openseg_img_feature(img_dir, openseg_model, text_emb, img_size=None,
 
     return feat_2d
 
-def extract_ovseg_img_feature(img_dir, openseg_model, text_emb, img_size=None, regional_pool=True):
+def extract_ovseg_img_feature(config_file,scene_id, cam, class_names, img_dir, model_weights):
     '''Extract per-pixel OvSeg features.'''
+    
 
-    # load RGB image
-    np_image_string = read_bytes(img_dir)
-    # run OpenSeg
-    results = openseg_model.signatures['serving_default'](
-            inp_image_bytes=tf.convert_to_tensor(np_image_string),
-            inp_text_emb=text_emb)
-    img_info = results['image_info']
-    crop_sz = [
-        int(img_info[0, 0] * img_info[2, 0]),
-        int(img_info[0, 1] * img_info[2, 1])
-    ]
-    if regional_pool:
-        image_embedding_feat = results['ppixel_ave_feat'][:, :crop_sz[0], :crop_sz[1]]
-    else:
-        image_embedding_feat = results['image_embedding_feat'][:, :crop_sz[0], :crop_sz[1]]
-    if img_size is not None:
-        feat_2d = tf.cast(tf.image.resize_nearest_neighbor(
-            image_embedding_feat, img_size, align_corners=True)[0], dtype=tf.float16).numpy()
-    else:
-        feat_2d = tf.cast(image_embedding_feat[[0]], dtype=tf.float16).numpy()
+    feat_2d, text_embeddings = get_image_embedding(config_file, scene_id, cam, class_names, img_dir, model_weights)
 
-    feat_2d = torch.from_numpy(feat_2d).permute(2, 0, 1)
 
-    return feat_2d
+    return feat_2d, text_embeddings
 
 def save_fused_feature(feat_bank, point_ids, n_points, out_dir, scene_id, args):
     '''Save features.'''
@@ -164,6 +150,73 @@ class PointCloudToImageMapper(object):
         mapping[1][inside_mask] = pi[0][inside_mask]
         mapping[2][inside_mask] = 1
 
+        return mapping.T
+    
+
+class PointCloudToImageMapperV1(object):
+    def __init__(self, visibility_threshold=0.25, cut_bound=0, intrinsics=None):
+        self.vis_thres = visibility_threshold
+        self.cut_bound = cut_bound
+        self.intrinsics = intrinsics
+
+    def compute_mapping(self, image_dim, scene_id, cam, camera_to_world, coords, depth=None, intrinsic=None):
+        """
+        :param camera_to_world: 4 x 4
+        :param coords: N x 3 format
+        :param depth: H x W format
+        :param intrinsic: 3x3 format
+        :return: mapping, N x 3 format, (H,W,mask)
+        """
+
+        #pdb.set_trace()
+        mapping = np.zeros((3, coords.shape[0]), dtype=int)
+        coords_new = np.concatenate([coords, np.ones([coords.shape[0], 1])], axis=1).T
+        assert coords_new.shape[0] == 4, "[!] Shape error"
+
+        #pdb.set_trace()
+        world_to_camera = np.linalg.inv(camera_to_world)
+        p = np.matmul(world_to_camera, coords_new)[:3,:]
+        p1 = np.dot(intrinsic, p).T
+        depth = p1[:, 2]
+        Zc = p1[:, 2:3]
+        p1 = p1[:, :2] / Zc
+        
+        p1 = np.round(p1).astype(int)
+        inside_mask = (p1[:,0] >= self.cut_bound) * (p1[:,1] >= self.cut_bound) * (p1[:,0] < image_dim[0]-self.cut_bound) * (p1[:,1] < image_dim[1]-self.cut_bound)
+        #pdb.set_trace()
+        front_mask = depth>0 # make sure the depth is in front
+        inside_mask = front_mask*inside_mask
+
+        # p[0] = (p[0] * intrinsic[0][0]) / p[2] + intrinsic[0][2]
+        # p[1] = (p[1] * intrinsic[1][1]) / p[2] + intrinsic[1][2]
+        # pi = np.round(p).astype(int) # simply round the projected coordinates
+        # inside_mask = (pi[0] >= self.cut_bound) * (pi[1] >= self.cut_bound) \
+        #             * (pi[0] < image_dim[0]-self.cut_bound) \
+        #             * (pi[1] < image_dim[1]-self.cut_bound)
+        # if depth is not None:
+        #     depth_cur = depth[pi[1][inside_mask], pi[0][inside_mask]]
+        #     occlusion_mask = np.abs(depth[pi[1][inside_mask], pi[0][inside_mask]]
+        #                             - p[2][inside_mask]) <= \
+        #                             self.vis_thres * depth_cur
+
+        #     inside_mask[inside_mask == True] = occlusion_mask
+        # else:
+        #     front_mask = p[2]>0 # make sure the depth is in front
+        #     inside_mask = front_mask*inside_mask
+
+        p1 = p1.T
+
+        mapping[0][inside_mask] = p1[1][inside_mask]
+        mapping[1][inside_mask] = p1[0][inside_mask]
+        mapping[2][inside_mask] = 1
+        #pdb.set_trace()
+        project_image = np.ones((image_dim[1], image_dim[0], 3))
+        project_image[mapping.T[inside_mask][:,0], mapping.T[inside_mask][:,1]] = [0, 255, 0]
+        output_dir = f"/home/fan.ling/big_model/OpenScene/OpenScene/data/test_project/{scene_id}_{cam}_project_image.jpg"
+        #print(project_image[mapping.T[inside_mask][:,0], mapping.T[inside_mask][:,1]])
+        
+        cv2.imwrite(output_dir,  project_image)
+        
         return mapping.T
 
 

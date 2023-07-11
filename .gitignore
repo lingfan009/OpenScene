@@ -12,6 +12,7 @@ fuse_2d_features/
 exp_dir/
 ori_sample_data/
 pre_train_model_checkpoint/
+lingfan_nuscenes_part_test/
 
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template

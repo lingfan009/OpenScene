@@ -33,7 +33,7 @@ NUSCENES_CLASS_REMAP[27] = 14 # terrain
 NUSCENES_CLASS_REMAP[28] = 15 # manmade
 NUSCENES_CLASS_REMAP[30] = 16 # vegetation
 
-# 将autra抽帧打包对齐的数据，转化成openscene支持的nuscene格式的训练数据集
+
 
 cam_types = ['camera_upmiddle_right', 'camera_upmiddle_middle', 'camera_upmiddle_left', 'camera_left_front', 'camera_left_backward', 'camera_right_front', 'camera_right_backward']
 cam_type_dict = {
@@ -58,7 +58,8 @@ def save_lidar_data(lidar_data, export_all_points=True, save_dir=""):
     torch.save((coords, 0, remapped_labels), save_dir)
 
 def adjust_intrinsic(intrinsic, intrinsic_image_dim, image_dim):
-    if intrinsic_image_dim == image_dim:
+    if intrinsic_image_dim[0] == image_dim[0] and intrinsic_image_dim[1] == image_dim[1]:
+        print(f"skip adjust_intrinsic")
         return intrinsic
     resize_width = int(math.floor(
         image_dim[1] * float(intrinsic_image_dim[0]) / float(intrinsic_image_dim[1])))
@@ -82,10 +83,13 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
             print("error for ", lidar_file)
 
         coors = np.concatenate([
-            pcd['y'], -pcd['x'], pcd['z'], pcd['intensity'],
+            pcd['x'], pcd['y'], pcd['z'], pcd['intensity'],
             pcd['timestamp']]).astype(np.float32).reshape(5, -1).T
-        valid_point_mask = (coors[:, 0] > 0) | (coors[:, 1] > 0)
+        print(coors[-10:-1,:])
+        valid_point_mask = ~((coors[:, 0] == 0) & (coors[:, 1] == 0) & (coors[:, 2] == 0))
         coors = coors[valid_point_mask]
+        print(coors[-10:-1,:])
+        print(coors.shape)
 
         labels = np.ones((coors.shape[0], 1))*17
         save_data = np.concatenate([coors, labels], axis=1)
@@ -121,7 +125,10 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
             # save image
             img = imageio.v3.imread(camera_file)
             img_shape = img.shape
-            img = cv2.resize(img, img_size)
+            img_size = (img_shape[1], img_shape[0])
+            if not (img_size[0] == img_shape[1]):
+                print(f"do resize {img_shape} -> {img_size}")
+                img = cv2.resize(img, img_size)
             imageio.imwrite(os.path.join(out_dir_color, camera_type + '.jpg'), img)
 
             # copy the camera parameters to the folder
@@ -142,7 +149,7 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
 
 
 def main():
-    autra_train_data = "ori_sample_data/Robin-20230511_131509_1683784739_1683784769"
+    autra_train_data = "ori_sample_data/Robin-20230626_144047_1687768882_1687768912"
     openscene_train_data = "data/"
     convert_autra_to_openscene_train_format(autra_train_data, openscene_train_data)
 

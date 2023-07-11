@@ -13,7 +13,7 @@ import tensorflow.compat.v1 as tf
 
 from dataset.point_loader import Point3DLoader
 import sys
-sys.path.append('/home/fan.ling/openscence/openscene_autra/OpenScene/scripts/feature_fusion')
+sys.path.append('/home/fan.ling/big_model/OpenScene/OpenScene/scripts/feature_fusion')
 from fusion_util import PointCloudToImageMapper
 from autra_ovseg import process_one_scene_online
 
@@ -66,24 +66,24 @@ class FusedFeatureLoader(Point3DLoader):
                 self.data_paths = data_paths
                 self.list_occur = list_occur
 
-        # online load feature
-        seed = 1457
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        np.random.seed(seed)
+        # # online load feature
+        # seed = 1457
+        # torch.manual_seed(seed)
+        # torch.cuda.manual_seed_all(seed)
+        # np.random.seed(seed)
 
-        self.img_dim = (800, 450)
-        self.saved_model_path = '/home/fan.ling/openscence/openscene_autra/OpenScene/model_checkpoint/openseg_exported_clip'
+        # self.img_dim = (800, 450)
+        # self.saved_model_path = '/home/fan.ling/openscence/openscene_autra/OpenScene/model_checkpoint/openseg_exported_clip'
 
-        self.openseg_model = tf2.saved_model.load(self.saved_model_path,
-                        tags=[tf.saved_model.tag_constants.SERVING],)
-        self.text_emb = tf.zeros([1, 1, 768])
-        self.feat_dim = 768
+        # self.openseg_model = tf2.saved_model.load(self.saved_model_path,
+        #                 tags=[tf.saved_model.tag_constants.SERVING],)
+        # self.text_emb = tf.zeros([1, 1, 768])
+        # self.feat_dim = 768
 
-        # calculate image pixel-3D points correspondances
-        self.point2img_mapper = PointCloudToImageMapper(
-                image_dim=self.img_dim,
-                cut_bound=5)
+        # # calculate image pixel-3D points correspondances
+        # self.point2img_mapper = PointCloudToImageMapper(
+        #         image_dim=self.img_dim,
+        #         cut_bound=5)
 
         if len(self.data_paths) == 0:
             raise Exception('0 file is loaded in the feature loader.')
