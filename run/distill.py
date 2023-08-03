@@ -4,6 +4,7 @@ import random
 import numpy as np
 import logging
 import argparse
+import pdb
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -265,8 +266,11 @@ def obtain_text_features_and_palette():
         palette = get_palette(colormap='matterport')
         dataset_name = 'matterport'
     elif 'nuscenes' in args.data_root:
-        labelset = list(NUSCENES_LABELS_16)
-        palette = get_palette(colormap='nuscenes16')
+        # labelset = list(NUSCENES_LABELS_16)
+        # palette = get_palette(colormap='nuscenes16')
+        # dataset_name = 'nuscenes'
+        labelset = list(NUSCENES_LABELS_6)
+        palette = get_palette(colormap='nuscenes6')
         dataset_name = 'nuscenes'
 
     if not os.path.exists('saved_text_embeddings'):
@@ -281,11 +285,17 @@ def obtain_text_features_and_palette():
     else:
         raise NotImplementedError
 
-    clip_file_name = 'saved_text_embeddings/clip_{}_labels{}.pt'.format(dataset_name, postfix)
+    #clip_file_name = 'saved_text_embeddings/clip_{}_labels{}.pt'.format(dataset_name, postfix)
+    clip_file_name = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
 
     try: # try to load the pre-saved embedding first
         logger.info('Load pre-computed embeddings from {}'.format(clip_file_name))
-        text_features = torch.load(clip_file_name).cuda()
+        #text_features = torch.load(clip_file_name).cuda()
+        text_features = torch.load(clip_file_name)["text_embedding_feature"].cuda()
+        print(text_features.dtype)
+        print(text_features.shape)
+        print(labelset)
+        print(palette)
     except: # extract CLIP text features and save them
         text_features = extract_clip_feature(labelset, model_name=model_name)
         torch.save(text_features, clip_file_name)
@@ -307,6 +317,7 @@ def distill(train_loader, model, optimizer, epoch):
     max_iter = args.epochs * len(train_loader)
 
     text_features, palette = obtain_text_features_and_palette()
+    print(f"epoch: {epoch}")
 
     # start the distillation process
     for i, batch_data in enumerate(train_loader):
@@ -330,6 +341,7 @@ def distill(train_loader, model, optimizer, epoch):
         else:
             raise NotImplementedError
 
+        #pdb.set_trace()
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -373,8 +385,10 @@ def distill(train_loader, model, optimizer, epoch):
     mask_first = (coords[mask][:, 0] == 0)
     output_3d = output_3d[mask_first]
     feat_3d = feat_3d[mask_first]
-    logits_pred = output_3d.half() @ text_features.t()
-    logits_img = feat_3d.half() @ text_features.t()
+
+    logits_pred = output_3d.half() @ text_features.half().t()
+    logits_img = feat_3d.half() @ text_features.half().t()
+
     logits_pred = torch.max(logits_pred, 1)[1].cpu().numpy()
     logits_img = torch.max(logits_img, 1)[1].cpu().numpy()
     mask = mask.cpu().numpy()
@@ -421,7 +435,7 @@ def validate(val_loader, model, criterion):
             label = label.cuda(non_blocking=True)
             output = model(sinput)
             output = output[inds_reverse, :]
-            output = output.half() @ text_features.t()
+            output = output.half() @ text_features.half().t()
             loss = criterion(output, label)
             output = torch.max(output, 1)[1]
 

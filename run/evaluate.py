@@ -4,6 +4,7 @@ import numpy as np
 import logging
 import argparse
 import urllib
+import pdb
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -74,7 +75,7 @@ def precompute_text_related_properties(labelset_name):
     elif labelset_name == 'matterport_3d' or labelset_name == 'matterport':
         labelset = list(MATTERPORT_LABELS_21)
         palette = get_palette(colormap='matterport')
-    elif labelset_name == 'property_info':
+    elif labelset_name == 'nuscenes_autra_3d_test_mask2former':
         labelset = list(PROPERTY_INFOS)
         palette = get_palette(colormap='property_info')
     elif 'matterport_3d_40' in labelset_name or labelset_name == 'matterport40':
@@ -87,8 +88,8 @@ def precompute_text_related_properties(labelset_name):
         labelset = list(MATTERPORT_LABELS_160)
         palette = get_palette(colormap='matterport_160')
     elif 'nuscenes' in labelset_name:
-        labelset = list(NUSCENES_LABELS_16)
-        palette = get_palette(colormap='nuscenes16')
+        labelset = list(NUSCENES_LABELS_6)
+        palette = get_palette(colormap='nuscenes6')
     else: # an arbitrary dataset, just use a large labelset
         labelset = list(MATTERPORT_LABELS_160)
         palette = get_palette(colormap='matterport_160')
@@ -99,7 +100,7 @@ def precompute_text_related_properties(labelset_name):
         mapper = torch.tensor(MAPPING_NUSCENES_DETAILS, dtype=int)
     text_features = extract_text_feature(labelset, args)
     # labelset.append('unknown')
-    labelset.append('unlabeled')
+    # labelset.append('unlabeled')
     return text_features, labelset, mapper, palette
 
 def main():
@@ -223,6 +224,22 @@ def main_worker(gpu, ngpus_per_node, argss):
         labelset_name = args.labelset
     evaluate(model, val_loader, labelset_name)
 
+
+def convert_to_sustech_format(pcl, logits_pred, pcd_save_path, palette):
+    label_len = int(len(palette)/3)
+    color_map = np.ones((label_len))
+    #pdb.set_trace()
+    for i in range(label_len):
+        
+        color_map[i] = (palette[i*3 + 0] << 16) + (palette[i*3 + 1] << 8) + (palette[i*3 + 2] << 0)
+    pcl_color = color_map[logits_pred].reshape((-1,1))
+    pcl_cls = logits_pred.reshape((-1,1))
+
+    save_data_np = np.concatenate([pcl, pcl_color, pcl_cls], axis=1)
+    save_data_np.astype(np.float32).tofile(pcd_save_path)
+    print(f"save_data_np:{save_data_np.shape}")
+
+
 def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
     '''Evaluate our OpenScene model.'''
 
@@ -258,6 +275,7 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
 
     text_features, labelset, mapper, palette = \
         precompute_text_related_properties(labelset_name)
+    #pdb.set_trace()
 
     with torch.no_grad():
         model.eval()
@@ -289,8 +307,11 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
                 if feature_type == 'distill':
                     predictions = model(sinput)
                     predictions = predictions[inds_reverse, :]
-                    pred = predictions.half() @ text_features.t()
+                    text_features = text_features.to(predictions.device)
+                    #pdb.set_trace()
+                    pred = predictions.half() @ text_features.half().t()
                     logits_pred = torch.max(pred, 1)[1].cpu()
+                    print(logits_pred.shape, logits_pred)
                 elif feature_type == 'fusion':
                     predictions = feat_3d.cuda(non_blocking=True)[inds_reverse, :]
                     pred = predictions.half() @ text_features.t()
@@ -338,6 +359,7 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
                     logits_pred = logits_pred[label_mask]
                     pred = pred[label_mask]
                     if vis_pred:
+                        print(val_data_loader.dataset.data_paths[i])
                         pcl = torch.load(val_data_loader.dataset.data_paths[i])[0][label_mask]
 
                 if vis_input:
@@ -351,11 +373,18 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
                         export_pointcloud(os.path.join(save_folder, '{}_{}.ply'.format(scene_name, feature_type)), pcl, colors=pred_label_color)
                     else:
                         pred_label_color = convert_labels_with_palette(logits_pred.numpy(), palette)
+                        print(logits_pred)
+                        print(torch.unique(logits_pred, return_counts=True))
                         export_pointcloud(os.path.join(save_folder, '{}_{}.ply'.format(scene_name, feature_type)), pcl, colors=pred_label_color)
                         visualize_labels(list(np.unique(logits_pred.numpy())),
                                     labelset,
                                     palette,
                                     os.path.join(save_folder, '{}_labels_{}.jpg'.format(i, feature_type)), ncol=5)
+                
+                # convert_to_sustech_format
+                scene_name = val_data_loader.dataset.data_paths[i].split('/')[-1].split('.pth')[0]
+                pcd_save_path = os.path.join("/mnt/cfs/agi/workspace/LidarAnnotation/data/nuscenes_autra_3d_no_label_package/lidar", scene_name + "-lidar.bin")
+                convert_to_sustech_format(pcl, logits_pred.numpy(), pcd_save_path, palette)
 
                 # Visualize GT labels
                 if vis_gt:

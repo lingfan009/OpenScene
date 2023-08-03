@@ -1,8 +1,8 @@
 DATA:
-  data_root: data/nuscenes_autra_3d_test
-  data_root_2d_fused_feature: fuse_2d_features/nuscenes_autra_2d_test
+  data_root: data/nuscenes_autra_3d_test_mask2former
+  data_root_2d_fused_feature: fuse_2d_features/nuscenes_autra_2d_test/mask2former_batch1
   feature_2d_extractor: openseg
-  classes: 16
+  classes: 134
   aug: False
   voxel_size: 0.05
   input_color: False
@@ -10,16 +10,16 @@ DATA:
   
 DISTILL:
   arch_3d: MinkUNet18A
-  ignore_label: 255
+  ignore_label: 0
   #train_gpu: [0,1,2,3]
   train_gpu: [0]
   workers: 16  # data loader workers
-  batch_size: 4  # batch size for training
-  batch_size_val: 4  # batch size for validation during training, memory and speed tradeoff
+  batch_size: 2  # batch size for training
+  batch_size_val: 2  # batch size for validation during training, memory and speed tradeoff
   base_lr: 0.0001
   loss_type: cosine # l1 | cosine
   loop: 1
-  epochs: 50
+  epochs: 100
   start_epoch: 0
   power: 0.9
   momentum: 0.9
@@ -29,7 +29,7 @@ DISTILL:
   save_path:
   resume:
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
-  eval_freq: 5
+  eval_freq: 10
 
 TEST:
   split: val  # split in [train, val]
@@ -45,7 +45,8 @@ TEST:
   test_gpu: [0]
   test_batch_size: 1
   test_repeats: 1
-  model_path: 'https://cvg-data.inf.ethz.ch/openscene/models/nuscenes_openseg.pth.tar'
+  #model_path: 'https://cvg-data.inf.ethz.ch/openscene/models/nuscenes_openseg.pth.tar'
+  model_path: /home/fan.ling/big_model/OpenScene/OpenScene/lingfan_autra_ovseg_distill_2075/model/model_last.pth.tar
   save_folder:
 
 Distributed:

@@ -16,14 +16,15 @@ import threading
 from fusion_util import extract_ovseg_img_feature, PointCloudToImageMapperV1
 
 config_file = "/home/fan.ling/big_model/OvSeg/OvSeg/configs/ovseg_swinB_vitL_demo.yaml"
-class_names = 'car,tree,grass,pole,road,cyclist,vehicle,truck,bicycle,other flat,buildings,safety barriers,sidewalk,manmade,sky,bus,suv,person,rider'
+class_names = 'car,tree,grass,pole,road,cyclist,vehicle,truck,bicycle,buildings,safety barriers,traffic cone,sidewalk,manmade,sky,bus,suv,person,rider'
 class_names = class_names.split(',')
-class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 
-               'fire hydrant', 'stop sign', 'parking meter', 'bench', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 
-               'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 
-               'tennis racket' 'couch', 'potted plant', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'banner', 'blanket', 'bridge', 
-               'net', 'pillow', 'platform', 'playingfield', 'railroad', 'road',  'stairs', 'tent', 'towel', 'water', 
-               'tree', 'fence', 'ceiling', 'sky', 'cabinet', 'mountain', 'grass', 'dirt',  'building', 'rock', 'wall', 'rug']
+#class_names = ['background', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush', 'banner', 'blanket', 'bridge', 'cardboard', 'counter', 'curtain', 'door-stuff', 'floor-wood', 'flower', 'fruit', 'gravel', 'house', 'light', 'mirror-stuff', 'net', 'pillow', 'platform', 'playingfield', 'railroad', 'river', 'road', 'roof', 'sand', 'sea', 'shelf', 'snow', 'stairs', 'tent', 'towel', 'wall-brick', 'wall-stone', 'wall-tile', 'wall-wood', 'water', 'window-blind', 'window', 'tree', 'fence', 'ceiling', 'sky', 'cabinet', 'table', 'floor', 'pavement', 'mountain', 'grass', 'dirt', 'paper', 'food', 'building', 'rock', 'wall', 'rug']
+# class_names = ['person', 'bicycle', 'car', 'motorcycle', 'bus', 'train', 'truck', 'bridge',
+#                'traffic light', 'traffic cone', 'fire hydrant', 'stop sign', 'suitcase', 'building',
+#                'road', 'water', 'tree', 'fence', 'sky', 'mountain', 'grass', 'dirt', 'rock', 'wall']
+#class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket' 'couch', 'potted plant', 'bed', 'dining table','microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush', 'banner', 'blanket', 'bridge',  'net', 'pillow', 'platform', 'playingfield', 'railroad', 'river', 'road',  'stairs', 'tent', 'towel', 'water', 'window-blind', 'window', 'tree', 'fence', 'ceiling', 'sky', 'cabinet', 'pavement', 'mountain', 'grass', 'dirt',  'building', 'rock', 'wall', 'rug']
+#class_names = ['background', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush', 'banner', 'blanket', 'bridge', 'cardboard', 'counter', 'curtain', 'door-stuff', 'floor-wood', 'flower', 'fruit', 'gravel', 'house', 'light', 'mirror-stuff', 'net', 'pillow', 'platform', 'playingfield', 'railroad', 'river', 'road', 'roof', 'sand', 'sea', 'shelf', 'snow', 'stairs', 'tent', 'towel', 'wall-brick', 'wall-stone', 'wall-tile', 'wall-wood', 'water', 'window-blind', 'window', 'tree', 'fence', 'ceiling', 'sky', 'cabinet', 'table', 'floor', 'pavement', 'mountain', 'grass', 'dirt', 'paper', 'food', 'building', 'rock', 'wall', 'rug']
+class_names = ['background', 'car', 'person', 'bicycle', "traffic cone", "road"]
 model_weights = 'MODEL.WEIGHTS /home/fan.ling/big_model/OvSeg/OvSeg/checkpoints/ovseg_swinbase_vitL14_ft_mpt.pth'
 
 def get_args():
@@ -42,7 +43,6 @@ def get_args():
 
 def process_one_scene(data_path, out_dir, args):
     '''Process one scene.'''
-
     # short hand
     split = args.split
     data_root_2d = args.data_root_2d
@@ -59,9 +59,10 @@ def process_one_scene(data_path, out_dir, args):
     n_points = locs_in.shape[0]
 
     scene_id = data_path.split('/')[-1].split('.')[0]
-    if exists(join(out_dir, scene_id +'.pt')):
+    print(join(out_dir,'point_with_feature', scene_id +'.pt'))
+    if exists(join(out_dir, 'point_with_feature', scene_id +'.pt')):
         print(scene_id +'.pt' + ' already done!')
-        return 1
+        #return 1
 
     # process 2D features
     scene = join(data_root_2d, split, scene_id)
@@ -74,7 +75,6 @@ def process_one_scene(data_path, out_dir, args):
     n_points_cur = n_points
     counter = torch.zeros((n_points_cur, 1), device=device)
     sum_features = torch.zeros((n_points_cur, args.feat_dim), device=device)
-
 
     vis_id = torch.zeros((n_points_cur, num_img), dtype=int, device=device)
     text_features_final = None
@@ -161,20 +161,8 @@ def main(args):
     total_num = len(data_paths)
     
     for i in trange(total_num):
-        process_one_scene(data_paths[i], out_dir, args)
-
-    # # multi thread handle
-    # with ThreadPoolExecutor(max_workers=max_workers) as pool:
-    #     #data_paths_list = []
-    #     for i in trange(total_num):
-    #         # data_paths_list.append((data_paths[i], out_dir, args, i))
-    #         # if len(data_paths_list) == 1 or (i+1) == total_num:
-    #         #     beg = time.perf_counter()
-    #         #     results = pool.map(process_one_scene1, data_paths_list)
-    #         #     data_paths_list.clear()
-    #         #     end = time.perf_counter()
-    #         #     print("multi time use: ",end-beg)
-    #         process_one_scene(data_paths[i], out_dir, args)
+        if i < 10:
+            process_one_scene(data_paths[i], out_dir, args)
 
 if __name__ == "__main__":
     args = get_args()

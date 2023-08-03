@@ -62,8 +62,14 @@ def extract_text_feature(labelset, args):
         text_features = extract_clip_feature(labelset, model_name="ViT-L/14@336px")
     else:
         raise NotImplementedError
+    print(text_features.shape, text_features)
 
-    return text_features
+    
+    text_embedding_path = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
+    text_embedding_feature = torch.load(text_embedding_path)["text_embedding_feature"].cpu()
+    print(text_embedding_feature.shape, text_embedding_feature)
+
+    return text_embedding_feature
 
 def extract_clip_img_feature_from_folder(folder, model_name='ViT-L/14@336px'):
     '''extract CLIP image features from a folder of images.'''
@@ -228,6 +234,11 @@ def get_palette(num_cls=21, colormap='scannet'):
         for _, value in NUSCENES16_COLORMAP.items():
             nuscenes16_palette.append(np.array(value))
         palette = np.concatenate(nuscenes16_palette)
+    elif colormap == 'nuscenes6':
+        nuscenes6_palette = []
+        for _, value in NUSCENES6_COLORMAP.items():
+            nuscenes6_palette.append(np.array(value))
+        palette = np.concatenate(nuscenes6_palette)
     else:
         n = num_cls
         palette = [0]*(n*3)
@@ -246,6 +257,24 @@ def get_palette(num_cls=21, colormap='scannet'):
     return palette
 
 def convert_labels_with_palette(input, palette):
+    '''Get image color palette for visualizing masks'''
+
+    new_3d = np.zeros((input.shape[0], 3))
+    u_index = np.unique(input)
+    for index in u_index:
+        if index == 255:
+            index_ = 20
+        else:
+            index_ = index
+
+        new_3d[input==index] = np.array(
+            [palette[index_ * 3] / 255.0,
+             palette[index_ * 3 + 1] / 255.0,
+             palette[index_ * 3 + 2] / 255.0])
+
+    return new_3d
+
+def convert_labels_to_sustech_format(input_pcd, palette):
     '''Get image color palette for visualizing masks'''
 
     new_3d = np.zeros((input.shape[0], 3))

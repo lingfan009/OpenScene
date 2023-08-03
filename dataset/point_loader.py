@@ -138,6 +138,7 @@ class Point3DLoader(torch.utils.data.Dataset):
     def __getitem__(self, index_long):
 
         index = index_long % len(self.data_paths)
+        #print(self.use_shm)
         if self.use_shm:
             locs_in = SA.attach("shm://%s_%s_%06d_locs_%08d" %
                                 (self.dataset_name, self.split, self.identifier, index)).copy()

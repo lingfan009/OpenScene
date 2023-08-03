@@ -66,25 +66,6 @@ class FusedFeatureLoader(Point3DLoader):
                 self.data_paths = data_paths
                 self.list_occur = list_occur
 
-        # # online load feature
-        # seed = 1457
-        # torch.manual_seed(seed)
-        # torch.cuda.manual_seed_all(seed)
-        # np.random.seed(seed)
-
-        # self.img_dim = (800, 450)
-        # self.saved_model_path = '/home/fan.ling/openscence/openscene_autra/OpenScene/model_checkpoint/openseg_exported_clip'
-
-        # self.openseg_model = tf2.saved_model.load(self.saved_model_path,
-        #                 tags=[tf.saved_model.tag_constants.SERVING],)
-        # self.text_emb = tf.zeros([1, 1, 768])
-        # self.feat_dim = 768
-
-        # # calculate image pixel-3D points correspondances
-        # self.point2img_mapper = PointCloudToImageMapper(
-        #         image_dim=self.img_dim,
-        #         cut_bound=5)
-
         if len(self.data_paths) == 0:
             raise Exception('0 file is loaded in the feature loader.')
 
@@ -99,7 +80,6 @@ class FusedFeatureLoader(Point3DLoader):
             labels_in = SA.attach("shm://%s_%s_%06d_labels_%08d" % (
                 self.dataset_name, self.split, self.identifier, index)).copy()
         else:
-
             locs_in, feats_in, labels_in = torch.load(self.data_paths[index])
             labels_in[labels_in == -100] = 255
             labels_in = labels_in.astype(np.uint8)
@@ -126,30 +106,17 @@ class FusedFeatureLoader(Point3DLoader):
 
             processed_data = torch.load(join(
                 self.datapath_feat, scene_name+'_%d.pt'%(nn_occur)))
-        # elif "nuscenes_autra" in self.dataset_name:
-        #     # online inference feature
-        #     #print(self.data_paths[index])
-        #     #processed_data = torch.load(join(self.datapath_feat, scene_name+'.pt'))
-        #     # data/nuscenes_autra_3d_test/train/1683784749023-Robin.pth
-
-        #     data_path = self.data_paths[index]
-        #     param_dict = {}
-        #     param_dict['split'] = self.split
-        #     param_dict['img_dim'] = self.img_dim
-        #     param_dict['data_root_2d'] = os.path.join(data_path.split("nuscenes_autra_3d_test")[0], "nuscenes_autra_2d_test")
-        #     param_dict['point2img_mapper'] = self.point2img_mapper
-        #     param_dict['openseg_model'] = self.openseg_model
-        #     param_dict['text_emb'] = self.text_emb
-        #     param_dict['feat_dim'] = self.feat_dim
-
-        #     processed_data = process_one_scene_online(data_path, param_dict)
             
         else:
             # no repeated file
-            processed_data = torch.load(join(self.datapath_feat, scene_name+'.pt'))
+            processed_data = torch.load(join(self.datapath_feat, scene_name+'.pth'))
+            #print(join(self.datapath_feat, scene_name+'.pth'))
+            #processed_data = torch.load(join(self.datapath_feat, '1684314011521-Robin.pth'))
+
             # if self.eval_type == "distill":
             #     #fusion_featue_path = join(self.datapath_feat, os.listdir(self.datapath_feat)[0])
-            #     fusion_featue_path = join(self.datapath_feat,scene_name+'.pt')
+            #     #fusion_featue_path = join(self.datapath_feat,scene_name+'.pt')
+            #     fusion_featue_path = join(self.datapath_feat,'1684314011521-Robin.pth')
             #     processed_data = torch.load(fusion_featue_path)
             #     mask_default = torch.zeros(locs_in.shape[0], dtype=torch.bool).numpy()
             #     mask_full = processed_data['mask_full']
@@ -157,6 +124,7 @@ class FusedFeatureLoader(Point3DLoader):
             #     mask_default[:] = False
             #     mask_default[:mask_shape] =  mask_full
             #     processed_data["mask_full"] = mask_default
+            #     print("11111")
             # else:
             #     processed_data = torch.load(join(self.datapath_feat, scene_name+'.pt'))
             #     mask_default = torch.zeros(locs_in.shape[0], dtype=torch.bool).numpy()
@@ -171,13 +139,15 @@ class FusedFeatureLoader(Point3DLoader):
         if len(processed_data.keys())==2:
             flag_mask_merge = True
             feat_3d, mask_chunk = processed_data['feat'], processed_data['mask_full']
+            #print(locs_in.shape, feat_3d.shape, mask_chunk.shape)
             if isinstance(mask_chunk, np.ndarray): # if the mask itself is a numpy array
                 mask_chunk = torch.from_numpy(mask_chunk)
             mask = copy.deepcopy(mask_chunk)
             if self.split != 'train': # val or test set
-                feat_3d_new = torch.zeros((locs_in.shape[0], feat_3d.shape[1]), dtype=feat_3d.dtype)
-                feat_3d_new[mask] = feat_3d
-                feat_3d = feat_3d_new
+                #feat_3d_new = torch.zeros((locs_in.shape[0], feat_3d.shape[1]), dtype=feat_3d.dtype)
+                #feat_3d_new = torch.zeros((mask_chunk.shape[0], feat_3d.shape[1]), dtype=feat_3d.dtype)
+                #feat_3d_new[mask] = feat_3d
+                #feat_3d = feat_3d_new
                 mask_chunk = torch.ones_like(mask_chunk) # every point needs to be evaluted
 
         elif len(processed_data.keys())>2: # legacy, for old processed features
