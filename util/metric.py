@@ -56,6 +56,8 @@ def evaluate(pred_ids, gt_ids, stdout=False, dataset='scannet_3d'):
         CLASS_LABELS = MATTERPORT_LABELS_21
     elif 'nuscenes_3d' in dataset:
         CLASS_LABELS = NUSCENES_LABELS_16
+    elif 'nuscenes_autra_3d' in dataset:
+        CLASS_LABELS = NUSCENES_LABELS_6
     else:
         raise NotImplementedError
 
@@ -73,32 +75,36 @@ def evaluate(pred_ids, gt_ids, stdout=False, dataset='scannet_3d'):
             continue
 
         class_ious[label_name] = get_iou(i, confusion)
-        class_accs[label_name] = class_ious[label_name][1] / (gt_ids==i).sum()
+        class_accs[label_name] = [class_ious[label_name][1] / (gt_ids==i).sum(), class_ious[label_name][1], (gt_ids==i).sum()]
         count+=1
 
         mean_iou += class_ious[label_name][0]
-        mean_acc += class_accs[label_name]
+        mean_acc += class_accs[label_name][0]
 
     mean_iou /= N_CLASSES
     mean_acc /= N_CLASSES
     if stdout:
-        print('classes          IoU')
-        print('----------------------------')
+        print('classes          IoU                          ACC')
+        print('---------------------------------------------------------')
         for i in range(N_CLASSES):
             label_name = CLASS_LABELS[i]
             try:
                 if 'matterport' in dataset:
-                    print('{0:<14s}: {1:>5.3f}'.format(label_name, class_accs[label_name]))
+                    print('{0:<14s}: {1:>5.3f}'.format(label_name, class_accs[label_name][0]))
 
                 else:
-                    print('{0:<14s}: {1:>5.3f}   ({2:>6d}/{3:<6d})'.format(
+                    print('{0:<14s}: {1:>5.3f}   ({2:>6d}/{3:<6d})      {4:>5.3f}    ({5:>6d}/{6:<6d})'.format(
                         label_name,
                         class_ious[label_name][0],
                         class_ious[label_name][1],
-                        class_ious[label_name][2]))
+                        class_ious[label_name][2],
+                        class_accs[label_name][0],
+                        class_accs[label_name][1],
+                        class_accs[label_name][2]))
             except:
                 print(label_name + ' error!')
                 continue
         print('Mean IoU', mean_iou)
         print('Mean Acc', mean_acc)
+
     return mean_iou

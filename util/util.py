@@ -9,6 +9,7 @@ from torch import nn
 from PIL import Image
 import open3d as o3d
 import clip
+import pdb
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -47,27 +48,8 @@ def extract_clip_feature(labelset, model_name="ViT-B/32"):
 
 def extract_text_feature(labelset, args):
     '''extract CLIP text features.'''
-
-    # a bit of prompt engineering
-    if hasattr(args, 'prompt_eng') and args.prompt_eng:
-        print('Use prompt engineering: a XX in a scene')
-        labelset = [ "a " + label + " in a scene" for label in labelset]
-        if 'scannet_3d' in args.data_root:
-            labelset[-1] = 'other'
-        if 'matterport_3d' in args.data_root:
-            labelset[-2] = 'other'
-    if 'lseg' in args.feature_2d_extractor:
-        text_features = extract_clip_feature(labelset)
-    elif 'openseg' in args.feature_2d_extractor:
-        text_features = extract_clip_feature(labelset, model_name="ViT-L/14@336px")
-    else:
-        raise NotImplementedError
-    print(text_features.shape, text_features)
-
-    
-    text_embedding_path = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
+    text_embedding_path = "saved_text_embeddings/text_embedding_feature_6_cls.pth"
     text_embedding_feature = torch.load(text_embedding_path)["text_embedding_feature"].cpu()
-    print(text_embedding_feature.shape, text_embedding_feature)
 
     return text_embedding_feature
 

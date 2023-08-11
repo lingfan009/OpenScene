@@ -74,11 +74,12 @@ def get_logger():
     logger_in.addHandler(handler)
     return logger_in
 
+logger = None
+writer = None
 
 def main_process():
     return not args.multiprocessing_distributed or (
         args.multiprocessing_distributed and args.rank % args.ngpus_per_node == 0)
-
 
 def main():
     '''Main function.'''
@@ -213,7 +214,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             train_sampler.set_epoch(epoch)
             if args.evaluate:
                 val_sampler.set_epoch(epoch)
-        loss_train = distill(train_loader, model, optimizer, epoch)
+        loss_train = distill(train_loader, model, optimizer, epoch, args.focal_loss_weight)
         epoch_log = epoch + 1
         if main_process():
             writer.add_scalar('loss_train', loss_train, epoch_log)
@@ -265,14 +266,15 @@ def obtain_text_features_and_palette():
         labelset = list(MATTERPORT_LABELS_21)
         palette = get_palette(colormap='matterport')
         dataset_name = 'matterport'
-    elif 'nuscenes' in args.data_root:
-        # labelset = list(NUSCENES_LABELS_16)
-        # palette = get_palette(colormap='nuscenes16')
-        # dataset_name = 'nuscenes'
+    elif 'nuscenes_autra_3d_dataset' in args.data_root:
         labelset = list(NUSCENES_LABELS_6)
         palette = get_palette(colormap='nuscenes6')
+        dataset_name = 'nuscenes_autra'
+    elif 'nuscenes' in args.data_root:
+        labelset = list(NUSCENES_LABELS_16)
+        palette = get_palette(colormap='nuscenes16')
         dataset_name = 'nuscenes'
-
+        
     if not os.path.exists('saved_text_embeddings'):
         os.makedirs('saved_text_embeddings')
 
@@ -285,25 +287,16 @@ def obtain_text_features_and_palette():
     else:
         raise NotImplementedError
 
-    #clip_file_name = 'saved_text_embeddings/clip_{}_labels{}.pt'.format(dataset_name, postfix)
-    clip_file_name = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
+    clip_file_name = 'saved_text_embeddings/text_embedding_feature_6_cls.pth'
+    #clip_file_name = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
 
-    try: # try to load the pre-saved embedding first
-        logger.info('Load pre-computed embeddings from {}'.format(clip_file_name))
-        #text_features = torch.load(clip_file_name).cuda()
-        text_features = torch.load(clip_file_name)["text_embedding_feature"].cuda()
-        print(text_features.dtype)
-        print(text_features.shape)
-        print(labelset)
-        print(palette)
-    except: # extract CLIP text features and save them
-        text_features = extract_clip_feature(labelset, model_name=model_name)
-        torch.save(text_features, clip_file_name)
+    print('Load pre-computed embeddings from {}'.format(clip_file_name))
+    text_features = torch.load(clip_file_name)["text_embedding_feature"].cuda()
 
     return text_features, palette
 
 
-def distill(train_loader, model, optimizer, epoch):
+def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
     '''Distillation pipeline.'''
 
     torch.backends.cudnn.enabled = True
@@ -324,7 +317,9 @@ def distill(train_loader, model, optimizer, epoch):
         data_time.update(time.time() - end)
 
         (coords, feat, label_3d, feat_3d, mask) = batch_data
-        coords[:, 1:4] += (torch.rand(3) * 100).type_as(coords)
+        
+        #coords[:, 1:4] += (torch.rand(3) * 100).type_as(coords)
+        coords[:, 1:4] += (torch.rand(3) * 10).type_as(coords)
         sinput = SparseTensor(
             feat.cuda(non_blocking=True), coords.cuda(non_blocking=True))
         feat_3d, mask = feat_3d.cuda(
@@ -334,8 +329,8 @@ def distill(train_loader, model, optimizer, epoch):
         output_3d = output_3d[mask]
 
         if hasattr(args, 'loss_type') and args.loss_type == 'cosine':
-            loss = (1 - torch.nn.CosineSimilarity()
-                    (output_3d, feat_3d)).mean()
+            loss = torch.pow((1 - torch.nn.CosineSimilarity()
+                    (output_3d, feat_3d)), focal_loss_weight).mean()
         elif hasattr(args, 'loss_type') and args.loss_type == 'l1':
             loss = torch.nn.L1Loss()(output_3d, feat_3d)
         else:
@@ -457,8 +452,8 @@ def validate(val_loader, model, criterion):
     mAcc = np.mean(accuracy_class)
     allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
     if main_process():
-        logger.info(
-            'Val result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.'.format(mIoU, mAcc, allAcc))
+        logger.info('Val result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.'.format(mIoU, mAcc, allAcc))
+
     return loss_meter.avg, mIoU, mAcc, allAcc
 
 
