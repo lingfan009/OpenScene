@@ -15,6 +15,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 from util import metric
 from torch.utils import model_zoo
+from pypcd import pypcd
 
 from MinkowskiEngine import SparseTensor
 from util import config
@@ -226,16 +227,57 @@ def main_worker(gpu, ngpus_per_node, argss):
     evaluate(model, val_loader, labelset_name)
 
 
+def make_xyz_rgb_label_point_cloud(xyz_rgb_lable, metadata=None):
+    """ Make a pointcloud object from xyz array.
+    xyz array is assumed to be float32.
+    rgb is assumed to be encoded as float32 according to pcl conventions.
+    """
+    md = {'version': .7,
+          'fields': ['x', 'y', 'z', 'rgb', 'label'],
+          'count': [1, 1, 1, 1, 1],
+          'width': len(xyz_rgb_lable),
+          'height': 1,
+          'viewpoint': [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+          'points': len(xyz_rgb_lable),
+          'type': ['F', 'F', 'F', 'U', 'U'],
+          'size': [4, 4, 4, 4, 4],
+          'data': 'binary'}
+    if xyz_rgb_lable.dtype != np.float32:
+        raise ValueError('array must be float32')
+    if metadata is not None:
+        md.update(metadata)
+
+    xyz_rgb_lable_copy = xyz_rgb_lable.copy()
+    rgb = xyz_rgb_lable[:,3].astype(np.uint32)
+    label = xyz_rgb_lable[:,4].astype(np.uint32)
+    
+    pc_data = xyz_rgb_lable_copy.view(np.dtype([('x', np.float32),
+                                     ('y', np.float32),
+                                     ('z', np.float32),
+                                     ('rgb', np.uint32),
+                                     ('label', np.uint32)])).squeeze()
+    pc_data['rgb']= rgb
+    pc_data['label']= label
+    pc = pypcd.PointCloud(md, pc_data)
+    return pc
+
 def convert_to_sustech_format(pcl, logits_pred, pcd_save_file, palette):
+    
     label_len = int(len(palette)/3)
     color_map = np.ones((label_len))
     for i in range(label_len):
         color_map[i] = (palette[i*3 + 0] << 16) + (palette[i*3 + 1] << 8) + (palette[i*3 + 2] << 0)
     pcl_color = color_map[logits_pred].reshape((-1,1))
     pcl_cls = logits_pred.reshape((-1,1))
-
     save_data_np = np.concatenate([pcl, pcl_color, pcl_cls], axis=1)
-    save_data_np.astype(np.float32).tofile(pcd_save_file)
+    
+    save_data_np_fp32 = save_data_np.astype(dtype=np.float32)
+    
+    save_data_pcd = make_xyz_rgb_label_point_cloud(save_data_np_fp32)
+    # save pcd
+    save_data_pcd.save_pcd(pcd_save_file, compression='binary')
+    # save bin
+    #save_data_np.astype(np.float32).tofile(pcd_save_file)
 
 def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
     '''Evaluate our OpenScene model.'''
@@ -370,10 +412,10 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
                 
                 # convert_to_sustech_format
                 scene_name = val_data_loader.dataset.data_paths[i].split('/')[-1].split('.pth')[0]
-                pcd_save_path = os.path.join(f"/mnt/cfs/agi/workspace/LidarAnnotation/data/{labelset_name}/lidar")
+                pcd_save_path = os.path.join(f"/mnt/cfs/agi/workspace/LidarAnnotation/data/{labelset_name}_pcd/lidar")
                 if not os.path.exists(pcd_save_path):
                     os.makedirs(pcd_save_path, exist_ok=True)
-                pcd_save_file = os.path.join(pcd_save_path, scene_name + "-lidar.bin")
+                pcd_save_file = os.path.join(pcd_save_path, scene_name + "-lidar.pcd")
                 convert_to_sustech_format(pcl, logits_pred.numpy(), pcd_save_file, palette)
 
                 # Visualize GT labels

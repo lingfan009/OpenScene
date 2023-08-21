@@ -1,1 +1,0 @@
-time:2023-06-06 16:33:18, log_content:generating version:autra_train_case_v1.0/, !

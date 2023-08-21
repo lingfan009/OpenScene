@@ -25,7 +25,7 @@ cam_type_dict = {
 }
 
 def get_clip_text_embedding():
-    text_embedding_path = "saved_text_embeddings/text_embedding_feature_6_cls.pth"
+    text_embedding_path = "model_checkpoint/saved_text_embeddings/text_embedding_feature_6_cls.pth"
     text_embedding_feature = torch.load(text_embedding_path)["text_embedding_feature"].numpy()
     return text_embedding_feature
 
@@ -36,7 +36,7 @@ def save_lidar_data(lidar_data, export_all_points=True, save_dir=""):
     category_id[category_id > 5] = 0
     torch.save((coords, 0, category_id), save_dir)
 
-def convert_autra_to_openscene_train_format(label_path, openscene_train_data, openscene_feature_data, package_root_path, dataset_type, dataset_name):
+def convert_autra_package_to_openscene_train_format(label_path, openscene_train_data, openscene_feature_data, package_root_path, dataset_type, dataset_name):
     record_name = label_path.split("/")[-1]
     package_path = osp.join(package_root_path, record_name)
 
@@ -96,6 +96,51 @@ def convert_autra_to_openscene_train_format(label_path, openscene_train_data, op
         feature_save_file = osp.join(feature_save_dir, frame_name + ".pth")
         torch.save({"feat": points_with_feature_torch.half().cpu(), "mask_full": mask_entire}, feature_save_file)
 
+def convert_autra_manual_label_to_openscene_train_format(label_path, openscene_train_data, openscene_feature_data, dataset_type, dataset_name):
+    lidar_label_path = osp.join(label_path, "detect_dem_seg_label")
+    for lidar_label_file in tqdm(os.listdir(lidar_label_path)):
+        frame_name = lidar_label_file.split('.')[0]
+        lidar_label_file_path = osp.join(lidar_label_path, lidar_label_file)
+        if (not osp.exists(lidar_label_file_path)) or ('log' in lidar_label_file):
+            print(f"miss {lidar_label_file}")
+            continue
+        # save lidar point and label
+        try:
+            pcd = pypcd.PointCloud.from_path(lidar_label_file_path).pc_data
+        except:
+            print("error for ", lidar_label_file_path)
+            continue
+
+        coors = np.concatenate([
+            pcd['x'], pcd['y'], pcd['z'], pcd['intensity'],
+            pcd['rgb'], pcd['label']]).astype(np.float32).reshape(6, -1).T
+
+        valid_point_mask = ~((coors[:, 0] == 0) & (coors[:, 1] == 0) & (coors[:, 2] == 0))
+        coors = coors[valid_point_mask]
+        lidar_save_dir = osp.join(openscene_train_data, dataset_name, dataset_type)
+        if not osp.exists(lidar_save_dir):
+            os.makedirs(lidar_save_dir)
+        lidar_save_file = osp.join(lidar_save_dir, frame_name + ".pth")
+        if osp.exists(lidar_save_file):
+            continue
+        save_lidar_data(coors, True, lidar_save_file)
+
+        # save label feature & fill text embedding features
+        text_embeddings = get_clip_text_embedding()
+        points_with_feature = np.zeros((coors.shape[0], 768))
+        labels = np.ascontiguousarray(coors[:, -1]).astype(int)
+        labels[labels > 5] = 0
+        points_with_feature[:] = text_embeddings[labels]
+        mask_entire = labels <= 5
+
+        # save point feature
+        points_with_feature_torch = torch.from_numpy(points_with_feature)
+        feature_save_dir = osp.join(openscene_feature_data, dataset_name)
+        if not osp.exists(feature_save_dir):
+            os.makedirs(feature_save_dir, exist_ok=True)
+        feature_save_file = osp.join(feature_save_dir, frame_name + ".pth")
+        torch.save({"feat": points_with_feature_torch.half().cpu(), "mask_full": mask_entire}, feature_save_file)
+
 def parse_args():
     args = argparse.ArgumentParser(description="Data processor for data labeling pipeline.")
     args.add_argument('--record_name', type=str, default='', help='config file path')
@@ -104,13 +149,21 @@ def parse_args():
 def main():
     args = parse_args()
 
-    openscene_train_point_data = "data/point_cloud_label_3d"
-    openscene_train_feature_data = "data/text_feature_3d/"
-    dataset_type = "train"
-    dataset_name = "nuscenes_autra_3d_dataset_v1"
-    record_path = f"/mnt/cfs/agi/data/pretrain/sun/auto_label_data/{args.record_name}"
-    package_root_path = "/mnt/cfs/agi/data/pretrain/sun/package_data"
-    convert_autra_to_openscene_train_format(record_path, openscene_train_point_data, openscene_train_feature_data, package_root_path, dataset_type, dataset_name)
+    if args.record_name.startswith("autra"):
+        openscene_train_point_data = "data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v2"
+        openscene_train_feature_data = "data/text_feature_3d/nuscenes_autra_3d_dataset_v2"
+        dataset_type = "train"
+        dataset_name = f"{args.record_name}"
+        record_path = f"/mnt/cfs/agi/data/pretrain/sun/auto_label_data/{args.record_name}"
+        convert_autra_manual_label_to_openscene_train_format(record_path, openscene_train_point_data, openscene_train_feature_data, dataset_type, dataset_name)
+    else:
+        openscene_train_point_data = "data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v3"
+        openscene_train_feature_data = "data/text_feature_3d/nuscenes_autra_3d_dataset_v3"
+        dataset_type = "train"
+        dataset_name = f"{args.record_name}"
+        record_path = f"/mnt/cfs/agi/data/pretrain/sun/auto_label_data/{args.record_name}"
+        package_root_path = "/mnt/cfs/agi/data/pretrain/sun/package_data"
+        convert_autra_package_to_openscene_train_format(record_path, openscene_train_point_data, openscene_train_feature_data, package_root_path, dataset_type, dataset_name)
 
 if __name__ == '__main__':
     main()

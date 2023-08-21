@@ -11,12 +11,11 @@ DATA:
 DISTILL:
   arch_3d: MinkUNet18A
   ignore_label: -1
-  #train_gpu: [0,1,2,3]
   train_gpu: [0,1,2,3]
   workers: 16  # data loader workers
   batch_size: 8  # batch size for training
   batch_size_val: 8  # batch size for validation during training, memory and speed tradeoff
-  base_lr: 0.0001
+  base_lr: 0.0000001
   loss_type: cosine # l1 | cosine
   focal_loss_weight: 1.3
   loop: 1
@@ -45,7 +44,7 @@ TEST:
   test_gpu: [0]
   test_batch_size: 1
   test_repeats: 1
-  model_path: /home/fan.ling/big_model/OpenScene/OpenScene/lingfan_autra_detect_dem_distill_0808_10W_focal_1.3/model/model_last.pth.tar
+  model_path: /home/fan.ling/big_model/OpenScene/OpenScene/lingfan_autra_detect_dem_distill_0808_10W_focal_1.3/model/model_best.pth.tar
   save_folder:
 
 Distributed:

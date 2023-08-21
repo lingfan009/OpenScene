@@ -171,7 +171,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             if main_process():
                 logger.info(
                     "=> no checkpoint found at '{}'".format(args.resume))
-
+    
     # ####################### Data Loader ####################### #
     if not hasattr(args, 'input_color'):
         # by default we do not use the point color as input
@@ -214,6 +214,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             train_sampler.set_epoch(epoch)
             if args.evaluate:
                 val_sampler.set_epoch(epoch)
+        
         loss_train = distill(train_loader, model, optimizer, epoch, args.focal_loss_weight)
         epoch_log = epoch + 1
         if main_process():
@@ -293,7 +294,7 @@ def obtain_text_features_and_palette():
     print('Load pre-computed embeddings from {}'.format(clip_file_name))
     text_features = torch.load(clip_file_name)["text_embedding_feature"].cuda()
 
-    return text_features, palette
+    return text_features, palette, labelset
 
 
 def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
@@ -309,7 +310,7 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
     end = time.time()
     max_iter = args.epochs * len(train_loader)
 
-    text_features, palette = obtain_text_features_and_palette()
+    text_features, palette, labels_set = obtain_text_features_and_palette()
     print(f"epoch: {epoch}")
 
     # start the distillation process
@@ -320,6 +321,7 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
         
         #coords[:, 1:4] += (torch.rand(3) * 100).type_as(coords)
         coords[:, 1:4] += (torch.rand(3) * 10).type_as(coords)
+        coords[:, 1:4] += (torch.rand(3) * 1).type_as(coords)
         sinput = SparseTensor(
             feat.cuda(non_blocking=True), coords.cuda(non_blocking=True))
         feat_3d, mask = feat_3d.cuda(
@@ -335,8 +337,6 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
             loss = torch.nn.L1Loss()(output_3d, feat_3d)
         else:
             raise NotImplementedError
-
-        #pdb.set_trace()
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -420,7 +420,7 @@ def validate(val_loader, model, criterion):
     target_meter = AverageMeter()
 
     # obtain the CLIP feature
-    text_features, _ = obtain_text_features_and_palette()
+    text_features, _ , labels_set= obtain_text_features_and_palette()
 
     with torch.no_grad():
         for batch_data in tqdm(val_loader):
@@ -453,6 +453,9 @@ def validate(val_loader, model, criterion):
     allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
     if main_process():
         logger.info('Val result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.'.format(mIoU, mAcc, allAcc))
+        for i in range(iou_class.shape[0]):
+            logger.info('Val result per class : {}: IoU/Acc {:.4f}/{:.4f}.'.format(labels_set[i], iou_class[i], accuracy_class[i]))
+        
 
     return loss_meter.avg, mIoU, mAcc, allAcc
 

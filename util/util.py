@@ -130,7 +130,8 @@ def intersectionAndUnionGPU(output, target, K, ignore_index=255):
     area_output = torch.histc(output.float().cpu(), bins=K, min=0, max=K - 1)
     area_target = torch.histc(target.float().cpu(), bins=K, min=0, max=K - 1)
     area_union = area_output + area_target - area_intersection
-    return area_intersection.cuda(), area_union.cuda(), area_target.cuda()
+    #return area_intersection.cuda(), area_union.cuda(), area_target.cuda()
+    return area_intersection.cuda(), area_union.cuda(), area_output.cuda()
 
 
 def check_mkdir(dir_name):

@@ -60,7 +60,7 @@ NUSCENES6_COLORMAP = {
     2: (255, 255, 0), # person
     3: (0, 0, 255), # bycicle
     4: (255, 0, 0), # traffic cone
-    5: (255, 255, 255), #road
+    5: (238,130,238), #road
     6: (0,0,0), # others
     }
 

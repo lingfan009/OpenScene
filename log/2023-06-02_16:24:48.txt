@@ -1,3 +1,0 @@
-time:2023-06-02 16:24:48, log_content:generating version:autra_train_v2.05/, !
-time:2023-06-02 16:24:48, log_content:generating version:autra_train_v2.13/, !
-time:2023-06-02 16:24:48, log_content:generating version:autra_train_v2.18/, !

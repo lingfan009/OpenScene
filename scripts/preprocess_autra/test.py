@@ -148,8 +148,26 @@ def main():
                 data_paths_list.clear()
 
 
+def static_frame_cnt():
+    dataset_root_path = "/mnt/cfs/agi/perception-dataset-v2/"
+    manual_label_root_path = "/mnt/cfs/agi/data/pretrain/sun/manual_result/"
+    auto_label_root_path = "/mnt/cfs/agi/data/pretrain/sun/auto_label_data/"
+    text_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/text_feature_3d/nuscenes_autra_3d_dataset_v2/"
+
+    for dataset in os.listdir(dataset_root_path):
+        if dataset.startswith("autra"):
+            if not osp.exists(osp.join(dataset_root_path, dataset, "bins")) or not osp.exists(osp.join(manual_label_root_path, dataset, "lidar")):
+                continue
+            detect_manual_cnt = len(os.listdir(osp.join(dataset_root_path, dataset, "bins")))
+            seg_manual_cnt = len(os.listdir(osp.join(manual_label_root_path, dataset, "lidar")))
+            auto_label_cnt = len(os.listdir(osp.join(auto_label_root_path, dataset, "detect_dem_seg_label")))
+            text_feature_cnt = len(os.listdir(osp.join(text_feature_root_path, dataset)))
+            print(f"{dataset}\t{detect_manual_cnt}\t{seg_manual_cnt}\t{auto_label_cnt}\t{text_feature_cnt}\t{detect_manual_cnt-text_feature_cnt}\t{auto_label_cnt-text_feature_cnt}")
+
 
 if __name__ == '__main__':
-    main()
+    #main()
 
     #download_perception_train()
+
+    static_frame_cnt()
