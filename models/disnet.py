@@ -22,14 +22,9 @@ class DisNet(nn.Module):
     '''3D Sparse UNet for Distillation.'''
     def __init__(self, cfg=None):
         super(DisNet, self).__init__()
-        if not hasattr(cfg, 'feature_2d_extractor'):
-            cfg.feature_2d_extractor = 'openseg'
-        if 'lseg' in cfg.feature_2d_extractor:
-            last_dim = 512
-        elif 'openseg' in cfg.feature_2d_extractor:
-            last_dim = 768
-        else:
-            raise NotImplementedError
+        if not hasattr(cfg, 'clip_dim'):
+            cfg.clip_dim = 768
+        last_dim = cfg.clip_dim
 
         # MinkowskiNet for 3D point clouds
         net3d = constructor3d(in_channels=3, out_channels=last_dim, D=3, arch=cfg.arch_3d)

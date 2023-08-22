@@ -209,6 +209,8 @@ def main_worker(gpu, ngpus_per_node, argss):
     from dataset.feature_loader import FusedFeatureLoader, collation_fn_eval_all
     val_data = FusedFeatureLoader(datapath_prefix=args.data_root,
                                 datapath_prefix_feat=args.data_root_2d_fused_feature,
+                                train_dataset_list=args.train_dataset_list,
+                                eval_dataset_list=args.eval_dataset_list,
                                 voxel_size=args.voxel_size, 
                                 split=args.split, aug=False,
                                 memcache_init=args.use_shm, eval_all=True, identifier=6797,

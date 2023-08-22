@@ -39,15 +39,22 @@ cate_map[22] = 1
 cate_map[23] = 1
 
 print(cate_map)
+
+dataset_version_map = dict()
+dataset_version_map['2023060202_180000-longmao-uniform_sample-discrete-seg_only'] = "autra_seg_eval_v1.01"
+
 def get_clip_text_embedding():
-    text_embedding_path = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
+    text_embedding_path = "/home/fan.ling/big_model/OpenScene/OpenScene/model_checkpoint/saved_text_embeddings/text_embedding_feature_6_cls.pth"
     text_embedding_feature = torch.load(text_embedding_path)["text_embedding_feature"].numpy()
     return text_embedding_feature
 
 
-def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_data):
-    for scene_name in tqdm(os.listdir(autra_train_data)):
-        label_file = osp.join(autra_train_data, scene_name, "label_result", scene_name+".bin")
+def convert_autra_to_openscene_train_format(autra_eval_data, openscene_eval_data):
+    batch_name = autra_eval_data.split("/")[-1]
+    dataset_version_name = dataset_version_map[batch_name]
+
+    for scene_name in tqdm(os.listdir(autra_eval_data)):
+        label_file = osp.join(autra_eval_data, scene_name, "label_result", scene_name+".bin")
         # save lidar
         try:
             pcd = np.fromfile(label_file, dtype=np.float32)
@@ -62,16 +69,18 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
         data_np[:, 0] = -data_np_copy[:, 1]
         data_np[:, 1] = data_np_copy[:, 0]
         
-        save_dir = osp.join(openscene_train_data, 'nuscenes_autra_3d_detect_dem_manual_label', 'val')
+        save_dir = osp.join(openscene_eval_data, 'point_cloud_label_3d', 'nuscenes_autra_3d_dataset_v3', dataset_version_name, 'train')
         if not osp.exists(save_dir):
             os.makedirs(save_dir)
-        save_file = osp.join(openscene_train_data, 'nuscenes_autra_3d_detect_dem_manual_label', 'val', scene_name + ".pth")
+        save_file = osp.join(save_dir, scene_name + ".pth")
 
         coors = np.ascontiguousarray(data_np[:, :3])
+        intensity = np.ascontiguousarray(data_np[:, 3:4]).astype(int)
         category_id = np.ascontiguousarray(data_np[:, -1]).astype(int)
         category_id[:] = cate_map[category_id]
         print(np.unique(category_id, return_counts=True))
-        torch.save((coors, 0, category_id), save_file)
+        print(np.unique(intensity, return_counts=True))
+        torch.save((coors, intensity, category_id), save_file)
         #save_lidar_data(coors, True, save_file)
 
         # save label feature
@@ -86,16 +95,16 @@ def convert_autra_to_openscene_train_format(autra_train_data, openscene_train_da
         # save point feature
         points_with_feature_torch = torch.from_numpy(points_with_feature)
 
-        save_dir = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/autra_detect_dem_label/"
+        save_dir = osp.join(openscene_eval_data, 'text_feature_3d', 'nuscenes_autra_3d_dataset_v3', dataset_version_name)
         if not osp.exists(save_dir):
             os.makedirs(save_dir)
         save_file = osp.join(save_dir, scene_name + ".pth")
         torch.save({"feat": points_with_feature_torch.half().cpu(), "mask_full": mask_entire}, save_file)
 
 def main():
-    autra_train_data = "/home/fan.ling/big_model/OpenScene/OpenScene/data/manual_label/2023060202_180000-longmao-uniform_sample-discrete-seg_only"
-    openscene_train_data = "data/"
-    convert_autra_to_openscene_train_format(autra_train_data, openscene_train_data)
+    autra_eval_data = "/mnt/cfs/agi/data/pretrain/sun/provider_manual_seg_result/2023060202_180000-longmao-uniform_sample-discrete-seg_only"
+    openscene_eval_data = "data/"
+    convert_autra_to_openscene_train_format(autra_eval_data, openscene_eval_data)
 
 if __name__ == '__main__':
     main()

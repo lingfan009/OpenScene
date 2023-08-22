@@ -20,10 +20,10 @@ from MinkowskiEngine import SparseTensor
 from util import config
 from util.util import AverageMeter, intersectionAndUnionGPU, \
     poly_learning_rate, save_checkpoint, \
-    export_pointcloud, get_palette, convert_labels_with_palette, extract_clip_feature
+    export_pointcloud, get_palette, convert_labels_with_palette
 from dataset.label_constants import *
 from dataset.feature_loader import FusedFeatureLoader, collation_fn
-from dataset.point_loader import Point3DLoader, collation_fn_eval_all
+from dataset.point_loader import AutraPoint3DLoader, collation_fn_eval_all
 from models.disnet import DisNet as Model
 from tqdm import tqdm
 
@@ -64,7 +64,6 @@ def get_parser():
 
 def get_logger():
     '''Define logger.'''
-
     logger_name = "main-logger"
     logger_in = logging.getLogger(logger_name)
     logger_in.setLevel(logging.DEBUG)
@@ -86,8 +85,7 @@ def main():
 
     args = get_parser()
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(
-        str(x) for x in args.train_gpu)
+    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(str(x) for x in args.train_gpu)
     cudnn.benchmark = True
     if args.manual_seed is not None:
         random.seed(args.manual_seed)
@@ -100,6 +98,7 @@ def main():
     if not hasattr(args, 'use_shm'):
         args.use_shm = True
 
+    # print torch env infos
     print(
         'torch.__version__:%s\ntorch.version.cuda:%s\ntorch.backends.cudnn.version:%s\ntorch.backends.cudnn.enabled:%s' % (
             torch.__version__, torch.version.cuda, torch.backends.cudnn.version(), torch.backends.cudnn.enabled))
@@ -160,7 +159,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             checkpoint = torch.load(
                 args.resume, map_location=lambda storage, loc: storage.cuda())
             args.start_epoch = checkpoint['epoch']
-            args.epochs = args.start_epoch + args.epochs
+            args.epochs = args.epochs
             model.load_state_dict(checkpoint['state_dict'], strict=True)
             optimizer.load_state_dict(checkpoint['optimizer'])
             best_iou = checkpoint['best_iou']
@@ -173,15 +172,17 @@ def main_worker(gpu, ngpus_per_node, argss):
                     "=> no checkpoint found at '{}'".format(args.resume))
     
     # ####################### Data Loader ####################### #
-    if not hasattr(args, 'input_color'):
+    if not hasattr(args, 'input_feature'):
         # by default we do not use the point color as input
-        args.input_color = False
+        args.input_feature = False
     train_data = FusedFeatureLoader(datapath_prefix=args.data_root,
                                     datapath_prefix_feat=args.data_root_2d_fused_feature,
+                                    train_dataset_list = args.train_dataset_list,
+                                    eval_dataset_list = args.eval_dataset_list,
                                     voxel_size=args.voxel_size,
                                     split='train', aug=args.aug,
                                     memcache_init=args.use_shm, loop=args.loop,
-                                    input_color=args.input_color
+                                    input_feature=args.input_feature
                                     )
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_data) if args.distributed else None
@@ -192,12 +193,14 @@ def main_worker(gpu, ngpus_per_node, argss):
                                             drop_last=True, collate_fn=collation_fn,
                                             worker_init_fn=worker_init_fn)
     if args.evaluate:
-        val_data = Point3DLoader(datapath_prefix=args.data_root,
+        val_data = AutraPoint3DLoader(datapath_prefix=args.data_root,
+                                 train_dataset_list = args.train_dataset_list,
+                                 eval_dataset_list = args.eval_dataset_list,
                                  voxel_size=args.voxel_size,
                                  split='val', aug=False,
                                  memcache_init=args.use_shm,
                                  eval_all=True,
-                                 input_color=args.input_color)
+                                 input_feature=args.input_feature)
         val_sampler = torch.utils.data.distributed.DistributedSampler(
             val_data) if args.distributed else None
         val_loader = torch.utils.data.DataLoader(val_data, batch_size=args.batch_size_val,
@@ -225,7 +228,6 @@ def main_worker(gpu, ngpus_per_node, argss):
             loss_val, mIoU_val, mAcc_val, allAcc_val = validate(
                 val_loader, model, criterion)
             # raise NotImplementedError
-
             if main_process():
                 writer.add_scalar('loss_val', loss_val, epoch_log)
                 writer.add_scalar('mIoU_val', mIoU_val, epoch_log)
@@ -257,41 +259,14 @@ def get_model(cfg):
 
 def obtain_text_features_and_palette():
     '''obtain the CLIP text feature and palette.'''
-
-    if 'scannet' in args.data_root:
-        labelset = list(SCANNET_LABELS_20)
-        labelset[-1] = 'other'
-        palette = get_palette()
-        dataset_name = 'scannet'
-    elif 'matterport' in args.data_root:
-        labelset = list(MATTERPORT_LABELS_21)
-        palette = get_palette(colormap='matterport')
-        dataset_name = 'matterport'
-    elif 'nuscenes_autra_3d_dataset' in args.data_root:
+    if 'nuscenes_autra_3d_dataset' in args.data_root:
         labelset = list(NUSCENES_LABELS_6)
         palette = get_palette(colormap='nuscenes6')
-        dataset_name = 'nuscenes_autra'
     elif 'nuscenes' in args.data_root:
         labelset = list(NUSCENES_LABELS_16)
         palette = get_palette(colormap='nuscenes16')
-        dataset_name = 'nuscenes'
-        
-    if not os.path.exists('saved_text_embeddings'):
-        os.makedirs('saved_text_embeddings')
 
-    if 'openseg' in args.feature_2d_extractor:
-        model_name="ViT-L/14@336px"
-        postfix = '_768' # the dimension of CLIP features is 768
-    elif 'lseg' in args.feature_2d_extractor:
-        model_name="ViT-B/32"
-        postfix = '_512' # the dimension of CLIP features is 512
-    else:
-        raise NotImplementedError
-
-    clip_file_name = 'saved_text_embeddings/text_embedding_feature_6_cls.pth'
-    #clip_file_name = "/home/fan.ling/big_model/OpenScene/OpenScene/fuse_2d_features/nuscenes_autra_2d_test/text_embedding_feature_6_cls.pth"
-
-    print('Load pre-computed embeddings from {}'.format(clip_file_name))
+    clip_file_name = 'model_checkpoint/saved_text_embeddings/text_embedding_feature_6_cls.pth'
     text_features = torch.load(clip_file_name)["text_embedding_feature"].cuda()
 
     return text_features, palette, labelset
@@ -310,18 +285,12 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
     end = time.time()
     max_iter = args.epochs * len(train_loader)
 
-    text_features, palette, labels_set = obtain_text_features_and_palette()
-    print(f"epoch: {epoch}")
-
     # start the distillation process
     for i, batch_data in enumerate(train_loader):
         data_time.update(time.time() - end)
-
         (coords, feat, label_3d, feat_3d, mask) = batch_data
         
-        #coords[:, 1:4] += (torch.rand(3) * 100).type_as(coords)
-        coords[:, 1:4] += (torch.rand(3) * 10).type_as(coords)
-        coords[:, 1:4] += (torch.rand(3) * 1).type_as(coords)
+        coords[:, 1:4] += (torch.rand(3) * 0.5).type_as(coords)
         sinput = SparseTensor(
             feat.cuda(non_blocking=True), coords.cuda(non_blocking=True))
         feat_3d, mask = feat_3d.cuda(
@@ -377,36 +346,6 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
 
         end = time.time()
 
-    mask_first = (coords[mask][:, 0] == 0)
-    output_3d = output_3d[mask_first]
-    feat_3d = feat_3d[mask_first]
-
-    logits_pred = output_3d.half() @ text_features.half().t()
-    logits_img = feat_3d.half() @ text_features.half().t()
-
-    logits_pred = torch.max(logits_pred, 1)[1].cpu().numpy()
-    logits_img = torch.max(logits_img, 1)[1].cpu().numpy()
-    mask = mask.cpu().numpy()
-    logits_gt = label_3d.numpy()[mask][mask_first.cpu().numpy()]
-    logits_gt[logits_gt == 255] = args.classes
-
-    pcl = coords[:, 1:].cpu().numpy()
-
-    seg_label_color = convert_labels_with_palette(
-        logits_img, palette)
-    pred_label_color = convert_labels_with_palette(
-        logits_pred, palette)
-    gt_label_color = convert_labels_with_palette(
-        logits_gt, palette)
-    pcl_part = pcl[mask][mask_first.cpu().numpy()]
-
-    export_pointcloud(os.path.join(args.save_path, 'result', 'last', '{}_{}.ply'.format(
-        args.feature_2d_extractor, epoch)), pcl_part, colors=seg_label_color)
-    export_pointcloud(os.path.join(args.save_path, 'result', 'last',
-                        'pred_{}.ply'.format(epoch)), pcl_part, colors=pred_label_color)
-    export_pointcloud(os.path.join(args.save_path, 'result', 'last',
-                        'gt_{}.ply'.format(epoch)), pcl_part, colors=gt_label_color)
-
     return loss_meter.avg
 
 
@@ -455,7 +394,6 @@ def validate(val_loader, model, criterion):
         logger.info('Val result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.'.format(mIoU, mAcc, allAcc))
         for i in range(iou_class.shape[0]):
             logger.info('Val result per class : {}: IoU/Acc {:.4f}/{:.4f}.'.format(labels_set[i], iou_class[i], accuracy_class[i]))
-        
 
     return loss_meter.avg, mIoU, mAcc, allAcc
 

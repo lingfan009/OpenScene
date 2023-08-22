@@ -31,10 +31,11 @@ def get_clip_text_embedding():
 
 def save_lidar_data(lidar_data, export_all_points=True, save_dir=""):
     coords = np.ascontiguousarray(lidar_data[:, :3])
+    intensity = np.ascontiguousarray(lidar_data[:, 3:4]).astype(int)
     category_id = np.ascontiguousarray(lidar_data[:, -1]).astype(int)
 
     category_id[category_id > 5] = 0
-    torch.save((coords, 0, category_id), save_dir)
+    torch.save((coords, intensity, category_id), save_dir)
 
 def convert_autra_package_to_openscene_train_format(label_path, openscene_train_data, openscene_feature_data, package_root_path, dataset_type, dataset_name):
     record_name = label_path.split("/")[-1]

@@ -152,6 +152,7 @@ def static_frame_cnt():
     dataset_root_path = "/mnt/cfs/agi/perception-dataset-v2/"
     manual_label_root_path = "/mnt/cfs/agi/data/pretrain/sun/manual_result/"
     auto_label_root_path = "/mnt/cfs/agi/data/pretrain/sun/auto_label_data/"
+    point_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v2/"
     text_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/text_feature_3d/nuscenes_autra_3d_dataset_v2/"
 
     for dataset in os.listdir(dataset_root_path):
@@ -163,6 +164,15 @@ def static_frame_cnt():
             auto_label_cnt = len(os.listdir(osp.join(auto_label_root_path, dataset, "detect_dem_seg_label")))
             text_feature_cnt = len(os.listdir(osp.join(text_feature_root_path, dataset)))
             print(f"{dataset}\t{detect_manual_cnt}\t{seg_manual_cnt}\t{auto_label_cnt}\t{text_feature_cnt}\t{detect_manual_cnt-text_feature_cnt}\t{auto_label_cnt-text_feature_cnt}")
+
+            point_feature_dataset_path = osp.join(point_feature_root_path, dataset, "train")
+            text_feature_dataset_path = osp.join(text_feature_root_path, dataset)
+            for file_name in os.listdir(point_feature_dataset_path):
+                point_file = osp.join(point_feature_dataset_path, file_name)
+                text_file = osp.join(text_feature_dataset_path, file_name)
+                if osp.exists(point_file):
+                    if not osp.exists(text_file):
+                        print(text_file)
 
 
 if __name__ == '__main__':
