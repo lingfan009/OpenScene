@@ -289,7 +289,7 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
     for i, batch_data in enumerate(train_loader):
         data_time.update(time.time() - end)
         (coords, feat, label_3d, feat_3d, mask) = batch_data
-        
+        #print(f"coords:{coords}, feat:{feat}")
         coords[:, 1:4] += (torch.rand(3) * 0.5).type_as(coords)
         sinput = SparseTensor(
             feat.cuda(non_blocking=True), coords.cuda(non_blocking=True))
