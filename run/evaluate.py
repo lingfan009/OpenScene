@@ -202,9 +202,9 @@ def main_worker(gpu, ngpus_per_node, argss):
         raise RuntimeError("=> no checkpoint found at '{}'".format(args.model_path))
 
     # ####################### Data Loader ####################### #
-    if not hasattr(args, 'input_color'):
+    if not hasattr(args, 'input_feature'):
         # by default we do not use the point color as input
-        args.input_color = False
+        args.input_feature = False
     
     from dataset.feature_loader import FusedFeatureLoader, collation_fn_eval_all
     val_data = FusedFeatureLoader(datapath_prefix=args.data_root,
@@ -214,7 +214,7 @@ def main_worker(gpu, ngpus_per_node, argss):
                                 voxel_size=args.voxel_size, 
                                 split=args.split, aug=False,
                                 memcache_init=args.use_shm, eval_all=True, identifier=6797,
-                                input_color=args.input_color)
+                                input_feature=args.input_feature)
     val_sampler = None
     val_loader = torch.utils.data.DataLoader(val_data, batch_size=args.test_batch_size,
                                                 shuffle=False, num_workers=args.test_workers, pin_memory=True,
@@ -341,8 +341,6 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
                 masks = []
 
             for i, (coords, feat, label, feat_3d, mask, inds_reverse) in enumerate(tqdm(val_data_loader)):
-                # if i > 10:
-                #     break
                 sinput = SparseTensor(feat.cuda(non_blocking=True), coords.cuda(non_blocking=True))
                 coords = coords[inds_reverse, :]
                 pcl = coords[:, 1:].cpu().numpy()
@@ -387,7 +385,7 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
 
                 # special case for nuScenes, evaluation points are only a subset of input
                 if 'nuscenes' in labelset_name:
-                    label_mask = (label!=256)
+                    label_mask = (label!=255)
                     label = label[label_mask]
                     logits_pred = logits_pred[label_mask]
                     pred = pred[label_mask]

@@ -60,7 +60,8 @@ class FusedFeatureLoader(AutraPoint3DLoader):
                 self.dataset_name, self.split, self.identifier, index)).copy()
         else:
             locs_in, feats_in, labels_in = torch.load(self.data_paths[index])
-            labels_in[labels_in == -100] = 255
+            #print(f" labels_in:{np.unique(labels_in, return_counts=True)}")
+            labels_in[labels_in == 999] = 255
             labels_in = labels_in.astype(np.uint8)
             if np.isscalar(feats_in) and feats_in == 0:
                 # no color in the input point cloud, e.g nuscenes lidar

@@ -119,7 +119,7 @@ class Point3DLoader(torch.utils.data.Dataset):
             for i, (locs, feats, labels) in enumerate(torch.utils.data.DataLoader(
                     self.data_paths, collate_fn=lambda x: torch.load(x[0]),
                     num_workers=min(16, mp.cpu_count()), shuffle=False)):
-                labels[labels == -100] = 255
+                labels[labels == 999] = 255
                 labels = labels.astype(np.uint8)
                 # no color in the input point cloud, e.g nuscenes
                 if np.isscalar(feats) and feats == 0:
@@ -148,7 +148,7 @@ class Point3DLoader(torch.utils.data.Dataset):
                                   (self.dataset_name, self.split, self.identifier, index)).copy()
         else:
             locs_in, feats_in, labels_in = torch.load(self.data_paths[index])
-            labels_in[labels_in == -100] = 255
+            labels_in[labels_in == 999] = 255
             labels_in = labels_in.astype(np.uint8)
             # no color in the input point cloud, e.g nuscenes
             if np.isscalar(feats_in) and feats_in == 0:
@@ -262,7 +262,7 @@ class AutraPoint3DLoader(torch.utils.data.Dataset):
             for i, (locs, feats, labels) in enumerate(torch.utils.data.DataLoader(
                     self.data_paths, collate_fn=lambda x: torch.load(x[0]),
                     num_workers=min(16, mp.cpu_count()), shuffle=False)):
-                labels[labels == -100] = 255
+                labels[labels == 999] = 255
                 labels = labels.astype(np.uint8)
                 # no color in the input point cloud, e.g nuscenes
                 if np.isscalar(feats) and feats == 0:
@@ -291,7 +291,7 @@ class AutraPoint3DLoader(torch.utils.data.Dataset):
                                   (self.dataset_name, self.split, self.identifier, index)).copy()
         else:
             locs_in, feats_in, labels_in = torch.load(self.data_paths[index])
-            labels_in[labels_in == -100] = 255
+            labels_in[labels_in == 999] = 255
             labels_in = labels_in.astype(np.uint8)
             # no color in the input point cloud, e.g nuscenes
             if np.isscalar(feats_in) and feats_in == 0:

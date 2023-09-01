@@ -218,7 +218,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             if args.evaluate:
                 val_sampler.set_epoch(epoch)
         
-        loss_train = distill(train_loader, model, optimizer, epoch, args.focal_loss_weight)
+        loss_train = distill(train_loader, model, optimizer, epoch, args.focal_loss_weight, args.ignore_miss_label)
         epoch_log = epoch + 1
         if main_process():
             writer.add_scalar('loss_train', loss_train, epoch_log)
@@ -226,7 +226,7 @@ def main_worker(gpu, ngpus_per_node, argss):
         is_best = False
         if args.evaluate and (epoch_log % args.eval_freq == 0):
             loss_val, mIoU_val, mAcc_val, allAcc_val = validate(
-                val_loader, model, criterion)
+                val_loader, model, criterion, args.ignore_miss_label)
             # raise NotImplementedError
             if main_process():
                 writer.add_scalar('loss_val', loss_val, epoch_log)
@@ -272,7 +272,7 @@ def obtain_text_features_and_palette():
     return text_features, palette, labelset
 
 
-def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
+def distill(train_loader, model, optimizer, epoch, focal_loss_weight, ignore_miss_label):
     '''Distillation pipeline.'''
 
     torch.backends.cudnn.enabled = True
@@ -298,6 +298,18 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
 
         output_3d = model(sinput)
         output_3d = output_3d[mask]
+        # ignore label == 999 point
+        #print(f"ignore_miss_label:{ignore_miss_label}")
+        #print(np.unique(label_3d, return_counts=True))
+        if ignore_miss_label:
+            miss_label_cnt = torch.sum(label_3d == 255).item()
+            #if miss_label_cnt > 0:
+            #    print(f"ignore before size: {output_3d.shape}, {feat_3d.shape} ")
+            label_3d_valid = label_3d != 255
+            output_3d = output_3d[label_3d_valid]
+            feat_3d = feat_3d[label_3d_valid]
+            #if miss_label_cnt > 0:
+            #    print(f"ignore after size: {output_3d.shape}, {feat_3d.shape} ")
 
         if hasattr(args, 'loss_type') and args.loss_type == 'cosine':
             loss = torch.pow((1 - torch.nn.CosineSimilarity()
@@ -349,7 +361,7 @@ def distill(train_loader, model, optimizer, epoch, focal_loss_weight):
     return loss_meter.avg
 
 
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion, ignore_miss_label):
     '''Validation.'''
 
     torch.backends.cudnn.enabled = False
@@ -369,6 +381,10 @@ def validate(val_loader, model, criterion):
             label = label.cuda(non_blocking=True)
             output = model(sinput)
             output = output[inds_reverse, :]
+            if ignore_miss_label:
+                label_valid = label != 255
+                label = label[label_valid]
+                output = output[label_valid]
             output = output.half() @ text_features.half().t()
             loss = criterion(output, label)
             output = torch.max(output, 1)[1]

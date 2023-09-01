@@ -13,10 +13,10 @@ DATA:
 DISTILL:
   arch_3d: MinkUNet18A
   ignore_label: -1
-  train_gpu: [0,1,2,3,4,5,6,7]
+  train_gpu: [0,1,2,3]
   workers: 16  # data loader workers
-  batch_size: 16  # batch size for training
-  batch_size_val: 16  # batch size for validation during training, memory and speed tradeoff
+  batch_size: 8  # batch size for training
+  batch_size_val: 8  # batch size for validation during training, memory and speed tradeoff
   base_lr: 0.00001
   loss_type: cosine # l1 | cosine
   focal_loss_weight: 1.5

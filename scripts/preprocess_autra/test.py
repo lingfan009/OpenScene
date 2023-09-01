@@ -14,6 +14,7 @@ from pypcd import pypcd
 import json
 from concurrent.futures import ThreadPoolExecutor
 import threading
+import torch
 
 def download_perception_train():
     dataset_version_list = [   
@@ -107,6 +108,10 @@ def download_perception_train():
         os.system(f"rclone copy  tos:perception-dataset-v2/{dataset_version}/bins  /mnt/cfs/agi/lingfan/perception-dataset-v2/{dataset_version}/bins --update --fast-list --timeout=0 --transfers=48 --progress --s3-disable-checksum ")
         os.system(f"rclone copy  tos:perception-dataset-v2/{dataset_version}/annos.pkl  /mnt/cfs/agi/lingfan/perception-dataset-v2/{dataset_version}/ --update --fast-list --timeout=0 --transfers=48 --progress --s3-disable-checksum ")
 
+def parse_args():
+    args = argparse.ArgumentParser(description="Data processor for data labeling pipeline.")
+    args.add_argument('--record_name', type=str, default='', help='config file path')
+    return args.parse_args()
 
 def process_one_scene1(params):
     try:
@@ -149,12 +154,14 @@ def main():
 
 
 def static_frame_cnt():
+    args = parse_args()
     dataset_root_path = "/mnt/cfs/agi/perception-dataset-v2/"
     manual_label_root_path = "/mnt/cfs/agi/data/pretrain/sun/manual_result/"
     auto_label_root_path = "/mnt/cfs/agi/data/pretrain/sun/auto_label_data/"
-    point_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v2/"
-    text_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/text_feature_3d/nuscenes_autra_3d_dataset_v2/"
+    point_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v4/"
+    text_feature_root_path = "/home/fan.ling/big_model/OpenScene/OpenScene/data/text_feature_3d/nuscenes_autra_3d_dataset_v4/"
 
+    """
     for dataset in os.listdir(dataset_root_path):
         if dataset.startswith("autra"):
             if not osp.exists(osp.join(dataset_root_path, dataset, "bins")) or not osp.exists(osp.join(manual_label_root_path, dataset, "lidar")):
@@ -173,7 +180,35 @@ def static_frame_cnt():
                 if osp.exists(point_file):
                     if not osp.exists(text_file):
                         print(text_file)
-
+    """
+    #for dataset in tqdm(os.listdir(point_feature_root_path)):
+    dataset = args.record_name
+    print("enter:" + dataset)
+    point_feature_dataset_path = osp.join(point_feature_root_path, dataset, "train")
+    text_feature_dataset_path = osp.join(text_feature_root_path, dataset)
+    for file_name in tqdm(os.listdir(point_feature_dataset_path)):
+        point_file = osp.join(point_feature_dataset_path, file_name)
+        text_file = osp.join(text_feature_dataset_path, file_name)
+        if osp.exists(point_file):
+            try:
+                locs_in, feats_in, labels_in = torch.load(point_file)
+                labels_in[labels_in == 999] = 255
+                if not osp.exists(text_file):
+                    print(text_file)
+                    os.system(f"rm {point_file}")
+            except:
+                print(f"error {point_file}")
+                os.system(f"rm {point_file}")
+                if osp.exists(text_file):
+                    os.system(f"rm {point_file}")
+            
+            try:
+                processed_data = torch.load(text_file)
+            except:
+                print(f"error {text_file}")
+                os.system(f"rm {text_file}")
+                if osp.exists(point_file):
+                    os.system(f"rm {point_file}")
 
 if __name__ == '__main__':
     #main()

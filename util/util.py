@@ -48,7 +48,7 @@ def extract_clip_feature(labelset, model_name="ViT-B/32"):
 
 def extract_text_feature(labelset, args):
     '''extract CLIP text features.'''
-    text_embedding_path = "saved_text_embeddings/text_embedding_feature_6_cls.pth"
+    text_embedding_path = "model_checkpoint/saved_text_embeddings/text_embedding_feature_6_cls.pth"
     text_embedding_feature = torch.load(text_embedding_path)["text_embedding_feature"].cpu()
 
     return text_embedding_feature
