@@ -44,6 +44,11 @@ def get_success_cnt(success_flag_list):
     return success_flag_cnt
 
 def main():
+    ignore_miss_flag = "/mnt/cfs/agi/lingfan/extract_frame/autra_core/experimental/lingfan/success_flag/ignore_miss_SUCCESS"
+    while not osp.exists(ignore_miss_flag):
+        print("convert sleep")
+        time.sleep(60)
+
     success_flag_dir = "log/convert_success_flag"
     dataset_root = "/mnt/cfs/agi/data/pretrain/sun/auto_label_data/"
     dataset_list = get_process_order(dataset_root)

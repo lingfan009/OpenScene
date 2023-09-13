@@ -1,0 +1,59 @@
+DATA:
+  data_root: data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v4
+  data_root_2d_fused_feature: data/text_feature_3d/nuscenes_autra_3d_dataset_v4
+  train_dataset_list: ['autra_train_case_m1.1','autra_train_case_m1.2','autra_train_m1.1','autra_train_m1.2_A001-20230504_122324','autra_train_m1.2_A001-20230504_142550','autra_train_m1.2_A001-20230517_140015','autra_train_m1.3','autra_train_m1.4','autra_train_m1.6','autra_train_m1.7','autra_train_m1.8']
+  #eval_dataset_list: ['autra_eval_m1.1','autra_eval_m1.2']
+  eval_dataset_list: ['2023090401_180000-longmao-data_mining-discrete-lidar_only']
+  clip_dim: 768
+  classes: 6
+  aug: False
+  voxel_size: 0.05
+  input_feature: True
+  use_shm: False
+  
+DISTILL:
+  arch_3d: MinkUNet18A
+  ignore_label: -1
+  train_gpu: [0,1,6,7]
+  workers: 16  # data loader workers
+  batch_size: 8  # batch size for training
+  batch_size_val: 8  # batch size for validation during training, memory and speed tradeoff
+  base_lr: 0.000001
+  loss_type: cosine # l1 | cosine
+  focal_loss_weight: 1.5  
+  ignore_miss_label: True
+  loop: 1
+  epochs: 150
+  start_epoch: 0
+  power: 0.9
+  momentum: 0.9
+  manual_seed: 3407
+  print_freq: 50
+  save_freq: 1
+  save_path:
+  resume:
+  evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
+  eval_freq: 1
+
+TEST:
+  split: val  # split in [train, val]
+  prompt_eng: True
+  mark_no_feature_to_unknown: True
+  feature_type: 'distill' # 'distill' | 'fusion' | 'ensemble'
+  save_feature_as_numpy: False
+  vis_input: False
+  vis_pred: True
+  vis_gt: False
+  test_workers: 1
+  test_gpu: [0]
+  test_batch_size: 1
+  test_repeats: 1
+  model_path: /home/fan.ling/big_model/OpenScene/OpenScene/exp_dir/autra_finetune_focal_1.5_epoch_150_prod_0907/model/model_last.pth.tar
+  save_folder:
+
+Distributed:
+  dist_url: tcp://127.0.0.1:6789
+  dist_backend: 'nccl'
+  multiprocessing_distributed: True
+  world_size: 1
+  rank: 0

@@ -154,7 +154,9 @@ def parse_args():
 
 def main():
     args = parse_args()
-
+    # v3 pre_train
+    # v4 manual_label_train
+    # v5
     if args.record_name.startswith("autra"):
         openscene_train_point_data = "data/point_cloud_label_3d/nuscenes_autra_3d_dataset_v4"
         openscene_train_feature_data = "data/text_feature_3d/nuscenes_autra_3d_dataset_v4"

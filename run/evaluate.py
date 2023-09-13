@@ -412,10 +412,10 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
                 
                 # convert_to_sustech_format
                 scene_name = val_data_loader.dataset.data_paths[i].split('/')[-1].split('.pth')[0]
-                pcd_save_path = os.path.join(f"/mnt/cfs/agi/workspace/LidarAnnotation/data/{labelset_name}_pcd/lidar")
+                pcd_save_path = os.path.join(f"/mnt/cfs/agi/workspace/LidarAnnotation/data/{labelset_name}_prod_sign_eval/lidar")
                 if not os.path.exists(pcd_save_path):
                     os.makedirs(pcd_save_path, exist_ok=True)
-                pcd_save_file = os.path.join(pcd_save_path, scene_name + "-lidar.pcd")
+                pcd_save_file = os.path.join(pcd_save_path, scene_name + ".pcd")
                 convert_to_sustech_format(pcl, logits_pred.numpy(), pcd_save_file, palette)
 
                 # Visualize GT labels
@@ -456,6 +456,15 @@ def evaluate(model, val_data_loader, labelset_name='scannet_3d'):
             if eval_iou:
                 gt = torch.cat(gts)
                 pred = torch.cat(preds)
+                
+                if args.test_repeats==1 and True:
+                    print(gt)
+                    print(pred)
+                    gt_ped_bicycle = (gt == 2) | (gt == 3)
+                    pred_ped_bicycle = (pred == 2) | (pred == 3)
+
+                    gt[gt_ped_bicycle] = 2
+                    pred[pred_ped_bicycle] = 2
 
                 pred_logit = pred
                 if args.test_repeats>1:
